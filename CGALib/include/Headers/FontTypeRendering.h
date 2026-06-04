@@ -79,13 +79,13 @@ public:
 	 * @param x Coordenada en X.
 	 * @param y Coordenada en Y.
 	 */
-	void render(const std::string &str, float x, float y);
+	void render(const std::string &str, float x, float y, float tamanio, float r, float g, float b);
 	/**
 	 * Destructor de clase.
 	 */
 	virtual ~FontTypeRendering();
 private:
-	void render_text(const std::string &str, FT_Face face, float x, float y, float tamano, float r, float g, float b,
+	void render_text(const std::string &str, FT_Face face, float x, float y,
 			float sx, float sy);
 private:
 	GLuint texture, sampler;

@@ -114,7 +114,7 @@ void FontTypeRendering::Initialize() {
  * @param x Coordenada en X.
  * @param y Coordenada en Y.
  */
-void FontTypeRendering::render(const std::string &str, float x, float y, float tamano, float r, float g, float b) {
+void FontTypeRendering::render(const std::string &str, float x, float y, float tamanio, float r, float g, float b) {
 	// Se activa la unidad de textura.
 	glActiveTexture (GL_TEXTURE0);
 	// Se enalza hacia el tipo de textura.
@@ -125,11 +125,11 @@ void FontTypeRendering::render(const std::string &str, float x, float y, float t
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glUseProgram (program);
 	// Se envia el color de la fuente.
-	glUniform4f(colorUniform, r, g, b, 1.0);
+	glUniform4f(colorUniform, 0.5, 1.0, 1.0, 1.0);
 	// Se envia la textura a utilizar.
 	glUniform1i(texUniform, 0);
 	// Se coloca el tama�o en Pixeles de la fuente.
-	FT_Set_Pixel_Sizes(face, 0, tamano);
+	FT_Set_Pixel_Sizes(face, 0, tamanio);
 	// Renderiza la fuente.
 	glEnable(GL_BLEND);
 	render_text(str, face, x, y, SCALEX, SCALEY);
@@ -146,10 +146,6 @@ void FontTypeRendering::render(const std::string &str, float x, float y, float t
  * @param y Coordenada y espacio de la pantalla.
  * @param sx Escala en X de la fuente
  * @param sy Escala en y de la fuente
- * @param tamano Tamao de la fuente
- * @param r Componente rojo del color
- * @param g Componente verde del color
- * @param b Componente azul del color
  */
 void FontTypeRendering::render_text(const std::string &str, FT_Face face,
 		float x, float y, float sx, float sy) {

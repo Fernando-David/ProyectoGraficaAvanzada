@@ -1727,8 +1727,7 @@ void renderAlphaScene(bool render = true){
 		boxIntro.render();
 		glDisable(GL_BLEND);
 
-		//Render text (disabled due to FontTypeRendering::render signature mismatch)
-		// modelText->render("Texto en OpenGL", -1, 0, 1, 0, 0, 24);
+		//modelText->render("Texto en OpenGL", -1, 0);
 	}
 }
 
