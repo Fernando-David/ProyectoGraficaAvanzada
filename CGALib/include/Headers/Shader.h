@@ -122,6 +122,8 @@ public:
 		glUseProgram(0);
 	}
 
+	GLuint getProgramID() const { return ShaderProgramId; }
+
 	void destroy();
 
 private:

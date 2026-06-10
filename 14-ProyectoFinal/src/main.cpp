@@ -74,7 +74,7 @@ Shader shaderDepth;
 // Shader para visualizar el buffer de profundidad
 Shader shaderViewDepth;
 //Shader para las particulas de fountain
-/*Shader shaderParticlesFountain;*/
+Shader shaderParticlesFountain;
 
 std::shared_ptr<Camera> camera(new ThirdPersonCamera());
 float distanceFromTarget = 7.0;
@@ -127,9 +127,14 @@ Model modelBuzzLeftHand;
 Model modelLamp1;
 Model modelLamp2;
 Model modelLampPost2;
+// Laberinto models
+Model modelEntrada;
+Model modelSalida;
+Model modelMuroDer;
+Model modelMuroIzq;
 // Modelos animados
-// Mayow
-Model mayowModelAnimate;
+// Player (replaces Mayow)
+Model playerModelAnimate;
 // Cowboy
 Model cowboyModelAnimate;
 // Guardian con lampara
@@ -138,6 +143,8 @@ Model guardianModelAnimate;
 Model cyborgModelAnimate;
 // Fountain
 Model modelFountain;
+// Antocha
+Model modelAntocha;
 // Terrain model instance
 Terrain terrain(-1, -1, 200, 8, "../Textures/heightmap.png");
 
@@ -162,12 +169,12 @@ GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
 GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
 GL_TEXTURE_CUBE_MAP_NEGATIVE_Z };
 
-std::string fileNames[6] = { "../Textures/mp_bloodvalley/blood-valley_ft.tga",
-		"../Textures/mp_bloodvalley/blood-valley_bk.tga",
-		"../Textures/mp_bloodvalley/blood-valley_up.tga",
-		"../Textures/mp_bloodvalley/blood-valley_dn.tga",
-		"../Textures/mp_bloodvalley/blood-valley_rt.tga",
-		"../Textures/mp_bloodvalley/blood-valley_lf.tga" };
+std::string fileNames[6] = { "../Textures/SkyboxProy/redeclipse_ft.png",
+	"../Textures/SkyboxProy/redeclipse_bk.png",
+	"../Textures/SkyboxProy/redeclipse_up.png",
+	"../Textures/SkyboxProy/redeclipse_dn.png",
+	"../Textures/SkyboxProy/redeclipse_rt.png",
+	"../Textures/SkyboxProy/redeclipse_lf.png" };
 
 bool exitApp = false;
 int lastMousePosX, offsetX = 0;
@@ -181,13 +188,25 @@ glm::mat4 modelMatrixLambo = glm::mat4(1.0);
 glm::mat4 modelMatrixAircraft = glm::mat4(1.0);
 glm::mat4 modelMatrixDart = glm::mat4(1.0f);
 glm::mat4 modelMatrixBuzz = glm::mat4(1.0f);
-glm::mat4 modelMatrixMayow = glm::mat4(1.0f);
+glm::mat4 modelMatrixPlayer = glm::mat4(1.0f);
 glm::mat4 modelMatrixCowboy = glm::mat4(1.0f);
 glm::mat4 modelMatrixGuardian = glm::mat4(1.0f);
 glm::mat4 modelMatrixCyborg = glm::mat4(1.0f);
 glm::mat4 modelMatrixFountain = glm::mat4(1.0f);
+glm::mat4 modelMatrixEntrada = glm::mat4(1.0f);
+glm::mat4 modelMatrixSalida = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuroDer = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuroIzq = glm::mat4(1.0f);
+// Antocha positions
+std::vector<glm::vec3> antochaPositions = {
+	glm::vec3(0.0f, 1.0f, 0.0f),
+	glm::vec3(0.0f, 1.0f, 0.0f),
+	glm::vec3(1.0f, 1.0f, 0.0f),
+	glm::vec3(0.0f, 1.0f, 0.0f),
+	glm::vec3(0.0f, 1.0f, 0.0f)
+};
 
-int animationMayowIndex = 1;
+int animationPlayerIndex = 0; // 0 = Idle by default for Player
 float rotDartHead = 0.0, rotDartLeftArm = 0.0, rotDartLeftHand = 0.0, rotDartRightArm = 0.0, rotDartRightHand = 0.0, rotDartLeftLeg = 0.0, rotDartRightLeg = 0.0;
 float rotBuzzHead = 0.0, rotBuzzLeftarm = 0.0, rotBuzzLeftForeArm = 0.0, rotBuzzLeftHand = 0.0;
 int modelSelected = 0;
@@ -256,7 +275,8 @@ std::vector<float> lamp2Orientation = {
 std::map<std::string, glm::vec3> blendingUnsorted = {
 		{"aircraft", glm::vec3(10.0, 0.0, -17.5)},
 		{"lambo", glm::vec3(23.0, 0.0, 0.0)},
-		{"heli", glm::vec3(5.0, 10.0, -5.0)}
+		{"heli", glm::vec3(5.0, 10.0, -5.0)},
+		{"fountain", glm::vec3(0.0)}
 };
 
 double deltaTime;
@@ -265,7 +285,7 @@ double currTime, lastTime;
 
 // Jump variables
 bool isJump = false;
-float GRAVITY = 1.81;
+float GRAVITY = 5.0;
 double tmv = 0;
 double startTimeJump = 0;
 
@@ -310,6 +330,11 @@ std::vector<bool> sourcesPlay = {true, true, true};
 
 // Framesbuffers
 GLuint depthMap, depthMapFBO;
+// variables  para  el sistema de particulas de la fuente
+GLuint initVel, startTime;
+GLuint VAOParticles;
+GLuint nParticles = 200;
+double currentTimeParticles, lastTimeParticles;
 
 // Se definen todos las funciones.
 void reshapeCallback(GLFWwindow *Window, int widthRes, int heightRes);
@@ -322,6 +347,69 @@ void initParticleBuffers();
 void init(int width, int height, std::string strTitle, bool bFullScreen);
 void destroy();
 bool processInput(bool continueApplication = true);
+
+void initParticleBuffers(){
+	//Generar los buffers
+	glGenBuffers(1, &initVel);
+	glGenBuffers(1, &startTime);
+
+	//reserva de memoria para los buffers
+	int sizeInitVel = nParticles * 3 * sizeof(GLfloat);
+	int sizeStartTime = nParticles * sizeof(GLfloat);
+	glBindBuffer(GL_ARRAY_BUFFER, initVel);
+	glBufferData(GL_ARRAY_BUFFER, sizeInitVel, NULL, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, startTime);
+	glBufferData(GL_ARRAY_BUFFER, sizeStartTime, NULL, GL_STATIC_DRAW);
+
+	// Generar la velocidad inicial con velocidades aleatorias
+	glm::vec3 v(0.0f);
+	float velocity, theta, phi;
+	GLfloat *data = new GLfloat[nParticles * 3];
+	for(unsigned int i = 0; i < nParticles; i++){
+		theta = glm::mix(0.0f, glm::pi<float>() / 6.0f, ((float) rand() / RAND_MAX));
+		phi = glm::mix(0.0f, glm::two_pi<float>(), ((float) rand() / RAND_MAX));
+
+		v.x = sinf(theta) * cosf(phi);
+		v.y = cosf(theta);
+		v.z = sinf(theta) * sinf(phi);
+
+		velocity = glm::mix(0.6f, 0.8f, ((float) rand() / RAND_MAX));
+		v = glm::normalize(v) * velocity;
+
+		data[3 * i] = v.x;
+		data[3 * i + 1] = v.y;
+		data[3 * i + 2] = v.z;
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, initVel);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeInitVel, data);
+	delete[] data;
+
+	// Tiempo inicial de la particula (Cuando nace)
+	data = new GLfloat[nParticles];
+	float time = 0.0f;
+	float rate = 0.00075f;
+	for (unsigned int i = 0; i < nParticles; i++) {
+		data[i] = time;
+		time += rate;
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, startTime);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeStartTime, data);
+	delete[] data;
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glGenVertexArrays(1, &VAOParticles);
+	glBindVertexArray(VAOParticles);
+	glBindBuffer(GL_ARRAY_BUFFER, initVel);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, startTime);
+	glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, NULL);
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+
+}
 
 // Implementacion de todas las funciones.
 void init(int width, int height, std::string strTitle, bool bFullScreen) {
@@ -385,7 +473,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	shaderTexture.initialize("../Shaders/texturizado.vs", "../Shaders/texturizado.fs");
 	shaderViewDepth.initialize("../Shaders/texturizado.vs", "../Shaders/texturizado_depth_view.fs");
 	shaderDepth.initialize("../Shaders/shadow_mapping_depth.vs", "../Shaders/shadow_mapping_depth.fs");
-	/*shaderParticlesFountain.initialize("../Shaders/particlesFountain.vs", "../Shaders/particlesFountain.fs");*/
+	shaderParticlesFountain.initialize("../Shaders/particlesFountain.vs", "../Shaders/particlesFountain.fs");
 
 	// Inicializacion de los objetos.
 	skyboxSphere.init();
@@ -503,9 +591,19 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelLampPost2.loadModel("../models/Street_Light/LampPost.obj");
 	modelLampPost2.setShader(&shaderMulLighting);
 
-	// Mayow
-	mayowModelAnimate.loadModel("../models/mayow/personaje2.fbx");
-	mayowModelAnimate.setShader(&shaderMulLighting);
+	// Laberinto models
+	modelEntrada.loadModel("../models/Laberinto/Entrada.obj");
+	modelEntrada.setShader(&shaderMulLighting);
+	modelSalida.loadModel("../models/Laberinto/Salida.obj");
+	modelSalida.setShader(&shaderMulLighting);
+	modelMuroDer.loadModel("../models/Laberinto/MuroDer.obj");
+	modelMuroDer.setShader(&shaderMulLighting);
+	modelMuroIzq.loadModel("../models/Laberinto/MuroIzq.obj");
+	modelMuroIzq.setShader(&shaderMulLighting);
+
+	// Player
+	playerModelAnimate.loadModel("../models/Player/Player.fbx");
+	playerModelAnimate.setShader(&shaderMulLighting);
 	
 	// Cowboy
 	cowboyModelAnimate.loadModel("../models/cowboy/Character Running.fbx");
@@ -522,6 +620,10 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	//Fountain
 	modelFountain.loadModel("../models/fountain/fountain.obj");
 	modelFountain.setShader(&shaderMulLighting);
+
+	// Antocha
+	modelAntocha.loadModel("../models/Antocha/Antocha.obj");
+	modelAntocha.setShader(&shaderMulLighting);
 
 	// Terreno
 	terrain.init();
@@ -771,7 +873,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	textureBlendMap.freeImage(); // Liberamos memoria
 
 	// Definiendo la textura
-	Texture textureIntro1("../Textures/Intro1.png");
+	Texture textureIntro1("../Textures/MenuJugar.png");
 	textureIntro1.loadImage(); // Cargar la textura
 	glGenTextures(1, &textureInit1ID); // Creando el id de la textura del landingpad
 	glBindTexture(GL_TEXTURE_2D, textureInit1ID); // Se enlaza la textura
@@ -790,7 +892,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	textureIntro1.freeImage(); // Liberamos memoria
 
 	// Definiendo la textura
-	Texture textureIntro2("../Textures/Intro2.png");
+	Texture textureIntro2("../Textures/MenuSalir.png");
 	textureIntro2.loadImage(); // Cargar la textura
 	glGenTextures(1, &textureInit2ID); // Creando el id de la textura del landingpad
 	glBindTexture(GL_TEXTURE_2D, textureInit2ID); // Se enlaza la textura
@@ -926,6 +1028,9 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//inicializacion de los datos de la particula de agua
+	initParticleBuffers();
 }
 
 void destroy() {
@@ -939,7 +1044,7 @@ void destroy() {
 	shaderMulLighting.destroy();
 	shaderSkybox.destroy();
 	shaderTerrain.destroy();
-	/*shaderParticlesFountain.destroy();*/
+	shaderParticlesFountain.destroy();
 
 	// Basic objects Delete
 	skyboxSphere.destroy();
@@ -987,7 +1092,7 @@ void destroy() {
 	modelLamp1.destroy();
 	modelLamp2.destroy();
 	modelLampPost2.destroy();
-	mayowModelAnimate.destroy();
+	playerModelAnimate.destroy();
 	cowboyModelAnimate.destroy();
 	guardianModelAnimate.destroy();
 	cyborgModelAnimate.destroy();
@@ -1015,6 +1120,14 @@ void destroy() {
 	// Cube Maps Delete
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	glDeleteTextures(1, &skyboxTextureID);
+
+	// Liberar los datos del buffer de las particulas de la fuente de agua
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &initVel);
+	glDeleteBuffers(1, &startTime);
+	glBindVertexArray(0);
+	glDeleteVertexArrays(1, &VAOParticles);
+
 }
 
 void reshapeCallback(GLFWwindow *Window, int widthRes, int heightRes) {
@@ -1098,11 +1211,16 @@ bool processInput(bool continueApplication) {
 		std::cout << "Right Trigger/R2: " << axes[5] << std::endl;
 
 		if(fabs(axes[1]) > 0.2){
-			modelMatrixMayow = glm::translate(modelMatrixMayow, glm::vec3(0, 0, -axes[1] * 0.1));
-			animationMayowIndex = 0;
-		}if(fabs(axes[0]) > 0.2){
-			modelMatrixMayow = glm::rotate(modelMatrixMayow, glm::radians(-axes[0] * 0.5f), glm::vec3(0, 1, 0));
-			animationMayowIndex = 0;
+			modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0, 0, -axes[1] * 0.1));
+			if(axes[1] > 0.0f)
+				animationPlayerIndex = 1; // run
+			else
+				animationPlayerIndex = 2; // run backward
+		}
+		if(fabs(axes[0]) > 0.2){
+			modelMatrixPlayer = glm::rotate(modelMatrixPlayer, glm::radians(-axes[0] * 0.5f), glm::vec3(0, 1, 0));
+			// keep idle on rotation
+			animationPlayerIndex = 0; // idle
 		}
 
 		if(fabs(axes[3]) > 0.2){
@@ -1135,7 +1253,7 @@ bool processInput(bool continueApplication) {
 	if (enableCountSelected && glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS){
 		enableCountSelected = false;
 		modelSelected++;
-		if(modelSelected > 4)
+		if(modelSelected > 5)
 			modelSelected = 0;
 		if(modelSelected == 1)
 			fileName = "../animaciones/animation_dart_joints.txt";
@@ -1145,6 +1263,15 @@ bool processInput(bool continueApplication) {
 			fileName = "../animaciones/animation_buzz_joints.txt";
 		if (modelSelected == 4)
 			fileName = "../animaciones/animation_buzz.txt";
+		if (modelSelected == 5) {
+			camera = std::shared_ptr<Camera>(new FirstPersonCamera(glm::vec3(0.0, 3.0, 4.0)));
+			camera->setSensitivity(5.0f); // Mayor sensibilidad para giro con mouse
+			std::cout << "Free camera mode active" << std::endl;
+		} else {
+			camera = std::shared_ptr<Camera>(new ThirdPersonCamera());
+			camera->setDistanceFromTarget(distanceFromTarget);
+			camera->setSensitivity(1.0f);
+		}
 		std::cout << "modelSelected:" << modelSelected << std::endl;
 	}
 	else if(glfwGetKey(window, GLFW_KEY_TAB) == GLFW_RELEASE)
@@ -1263,21 +1390,54 @@ bool processInput(bool continueApplication) {
 	else if (modelSelected == 2 && glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
 		modelMatrixBuzz = glm::translate(modelMatrixBuzz, glm::vec3(0.0, 0.0, -0.02));
 
-	// Controles de mayow
+	// Controles del player
 	if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS){
-		modelMatrixMayow = glm::rotate(modelMatrixMayow, 0.02f, glm::vec3(0, 1, 0));
-		animationMayowIndex = 0;
+		modelMatrixPlayer = glm::rotate(modelMatrixPlayer, 0.02f, glm::vec3(0, 1, 0));
+		animationPlayerIndex = 0;
 	} else if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS){
-		modelMatrixMayow = glm::rotate(modelMatrixMayow, -0.02f, glm::vec3(0, 1, 0));
-		animationMayowIndex = 0;
+		modelMatrixPlayer = glm::rotate(modelMatrixPlayer, -0.02f, glm::vec3(0, 1, 0));
+		animationPlayerIndex = 0;
 	}
 	if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS){
-		modelMatrixMayow = glm::translate(modelMatrixMayow, glm::vec3(0.0, 0.0, 0.02));
-		animationMayowIndex = 0;
+		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, 0.1));
+		animationPlayerIndex = 1; // run when moving forward
 	}
 	else if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS){
-		modelMatrixMayow = glm::translate(modelMatrixMayow, glm::vec3(0.0, 0.0, -0.02));
-		animationMayowIndex = 0;
+		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, -0.1));
+		animationPlayerIndex = 2; // run backward
+	}
+
+	// Animation placeholders / manual overrides for testing
+	if (modelSelected == 0) {
+		if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) animationPlayerIndex = 0; // idle
+		if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) animationPlayerIndex = 2; // Runback
+		if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) animationPlayerIndex = 3; // Block
+		if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) animationPlayerIndex = 4; // death
+		if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) animationPlayerIndex = 5; // idle
+		if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) animationPlayerIndex = 6; // run back
+		// keys 7/8 left as optional extra clips if present
+		if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS) animationPlayerIndex = 7; //death
+		if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS) animationPlayerIndex = 8;
+		if (glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS) animationPlayerIndex = 9;
+		if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) animationPlayerIndex = 1; //Run
+	}
+
+	if (modelSelected == 5) {
+		FirstPersonCamera *fps = dynamic_cast<FirstPersonCamera*>(camera.get());
+		if (fps) {
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+				fps->moveFrontCamera(true, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+				fps->moveFrontCamera(false, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+				fps->moveRightCamera(true, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+				fps->moveRightCamera(false, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+				fps->setPosition(fps->getPosition() + glm::vec3(0.0f, 0.02f, 0.0f));
+			if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+				fps->setPosition(fps->getPosition() - glm::vec3(0.0f, 0.02f, 0.0f));
+		}
 	}
 
 	bool keySpaceStatus = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
@@ -1344,8 +1504,8 @@ void prepareScene(){
 	//Grass
 	//modelGrass.setShader(&shaderMulLighting);
 
-	//Mayow
-	mayowModelAnimate.setShader(&shaderMulLighting);
+	//Player
+	playerModelAnimate.setShader(&shaderMulLighting);
 
 	//Cowboy
 	cowboyModelAnimate.setShader(&shaderMulLighting);
@@ -1413,8 +1573,8 @@ void prepareDepthScene(){
 	//Grass
 	//modelGrass.setShader(&shaderDepth);
 
-	//Mayow
-	mayowModelAnimate.setShader(&shaderDepth);
+	//Player
+	playerModelAnimate.setShader(&shaderDepth);
 
 	//Cowboy
 	cowboyModelAnimate.setShader(&shaderDepth);
@@ -1461,6 +1621,13 @@ void renderSolidScene(){
 	//Rock render
 	matrixModelRock[3][1] = terrain.getHeightTerrain(matrixModelRock[3][0], matrixModelRock[3][2]);
 	modelRock.render(matrixModelRock);
+
+	// Laberinto models at origin
+	modelEntrada.render(modelMatrixEntrada);
+	modelSalida.render(modelMatrixSalida);
+	modelMuroDer.render(modelMatrixMuroDer);
+	modelMuroIzq.render(modelMatrixMuroIzq);
+
 	// Forze to enable the unit texture to 0 always ----------------- IMPORTANT
 	glActiveTexture(GL_TEXTURE0);
 
@@ -1589,24 +1756,25 @@ void renderSolidScene(){
 	/*****************************************
 	 * Objetos animados por huesos
 	 * **************************************/
-	glm::vec3 ejey = glm::normalize(terrain.getNormalTerrain(modelMatrixMayow[3][0], modelMatrixMayow[3][2]));
-	glm::vec3 ejex = glm::vec3(modelMatrixMayow[0]);
+	glm::vec3 ejey = glm::normalize(terrain.getNormalTerrain(modelMatrixPlayer[3][0], modelMatrixPlayer[3][2]));
+	glm::vec3 ejex = glm::vec3(modelMatrixPlayer[0]);
 	glm::vec3 ejez = glm::normalize(glm::cross(ejex, ejey));
 	ejex = glm::normalize(glm::cross(ejey, ejez));
-	modelMatrixMayow[0] = glm::vec4(ejex, 0.0);
-	modelMatrixMayow[1] = glm::vec4(ejey, 0.0);
-	modelMatrixMayow[2] = glm::vec4(ejez, 0.0);
-	modelMatrixMayow[3][1] = -GRAVITY * tmv * tmv + 3.5 * tmv + terrain.getHeightTerrain(modelMatrixMayow[3][0], modelMatrixMayow[3][2]);
+	modelMatrixPlayer[0] = glm::vec4(ejex, 0.0);
+	modelMatrixPlayer[1] = glm::vec4(ejey, 0.0);
+	modelMatrixPlayer[2] = glm::vec4(ejez, 0.0);
+	modelMatrixPlayer[3][1] = -GRAVITY * tmv * tmv + 5.0 * tmv + terrain.getHeightTerrain(modelMatrixPlayer[3][0], modelMatrixPlayer[3][2]);
 	tmv = currTime - startTimeJump;
-	if(modelMatrixMayow[3][1] < terrain.getHeightTerrain(modelMatrixMayow[3][0], modelMatrixMayow[3][2])){
+	if(modelMatrixPlayer[3][1] < terrain.getHeightTerrain(modelMatrixPlayer[3][0], modelMatrixPlayer[3][2])){
 		isJump = false;
-		modelMatrixMayow[3][1] = terrain.getHeightTerrain(modelMatrixMayow[3][0], modelMatrixMayow[3][2]);
+		modelMatrixPlayer[3][1] = terrain.getHeightTerrain(modelMatrixPlayer[3][0], modelMatrixPlayer[3][2]);
 	}
-	glm::mat4 modelMatrixMayowBody = glm::mat4(modelMatrixMayow);
-	modelMatrixMayowBody = glm::scale(modelMatrixMayowBody, glm::vec3(0.021f));
-	mayowModelAnimate.setAnimationIndex(animationMayowIndex);
-	mayowModelAnimate.render(modelMatrixMayowBody);
-	//animationMayowIndex = 1;
+	glm::mat4 modelMatrixPlayerBody = glm::mat4(modelMatrixPlayer);
+	modelMatrixPlayerBody = glm::scale(modelMatrixPlayerBody, glm::vec3(0.015f));
+	modelMatrixPlayerBody = glm::rotate(modelMatrixPlayerBody, glm::radians(180.0f), glm::vec3(0, 1, 0));
+	playerModelAnimate.setAnimationIndex(animationPlayerIndex);
+	playerModelAnimate.render(modelMatrixPlayerBody);
+	//animationPlayerIndex = 1;
 
 	modelMatrixCowboy[3][1] = terrain.getHeightTerrain(modelMatrixCowboy[3][0], modelMatrixCowboy[3][2]);
 	glm::mat4 modelMatrixCowboyBody = glm::mat4(modelMatrixCowboy);
@@ -1630,6 +1798,14 @@ void renderSolidScene(){
 	glm::mat4 modelMatrixFountainCopy = glm::scale(modelMatrixFountain, glm::vec3(10.0f, 10.0f, 10.0f));
 	modelFountain.render(modelMatrixFountainCopy);
 	glEnable(GL_CULL_FACE);
+
+	// Antochas
+	for(int i = 0; i < antochaPositions.size(); i++){
+		glm::mat4 modelMatrixAntochaTemp = glm::mat4(1.0f);
+		modelMatrixAntochaTemp = glm::translate(modelMatrixAntochaTemp, antochaPositions[i]);
+		modelMatrixAntochaTemp = glm::scale(modelMatrixAntochaTemp, glm::vec3(1.0f, 1.0f, 1.0f));
+		modelAntocha.render(modelMatrixAntochaTemp);
+	}
 
 	/*******************************************
 	 * Skybox
@@ -1658,6 +1834,8 @@ void renderAlphaScene(bool render = true){
 	blendingUnsorted.find("lambo")->second = glm::vec3(modelMatrixLambo[3]);
 	// Update the helicopter
 	blendingUnsorted.find("heli")->second = glm::vec3(modelMatrixHeli[3]);
+	// update the fountain
+	blendingUnsorted.find("fountain")->second = glm::vec3(modelMatrixFountain[3]);
 
 	/**********
 	 * Sorter with alpha objects
@@ -1712,6 +1890,30 @@ void renderAlphaScene(bool render = true){
 			modelMatrixHeliHeli = glm::translate(modelMatrixHeliHeli, glm::vec3(0.0, 0.0, 0.249548));
 			modelHeliHeli.render(modelMatrixHeliHeli);
 		}
+		else if(render && it->second.first.compare("fountain") == 0){
+			// Se renderiza el sistema de partículas de la fuente
+			glm::mat4 modelMatrixParticlesFountain = glm::mat4(1.0);
+			modelMatrixParticlesFountain = glm::translate(modelMatrixParticlesFountain, it->second.second);
+			modelMatrixParticlesFountain[3][1] = terrain.getHeightTerrain(modelMatrixParticlesFountain[3][0], modelMatrixParticlesFountain[3][2]) + 4.2f;
+			modelMatrixParticlesFountain = glm::scale(modelMatrixParticlesFountain, glm::vec3(3.0f));
+			currentTimeParticles = TimeManager::Instance().GetTime();
+			if(currentTimeParticles - lastTimeParticles > 10.0f){
+				lastTimeParticles = currentTimeParticles;}
+			glDepthMask(GL_FALSE);
+			glPointSize(10.0f);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, textureParticleFountainID);
+			shaderParticlesFountain.turnOn();
+			shaderParticlesFountain.setFloat("Time", float(currentTimeParticles - lastTimeParticles));
+			shaderParticlesFountain.setFloat("ParticleLifetime", 10.0f);
+			shaderParticlesFountain.setInt("ParticleTex", 0);
+			shaderParticlesFountain.setVectorFloat3("Gravity", glm::value_ptr(glm::vec3(0.0f, -0.01f, 0.0f)));
+			shaderParticlesFountain.setMatrix4("model", 1, false, glm::value_ptr(modelMatrixParticlesFountain));
+			glBindVertexArray(VAOParticles);
+			glDrawArrays(GL_POINTS, 0, nParticles);
+			glDepthMask(GL_TRUE);
+			shaderParticlesFountain.turnOff();
+		}
 	}
 	glEnable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
@@ -1763,8 +1965,8 @@ void applicationLoop() {
 
 	modelMatrixBuzz = glm::translate(modelMatrixBuzz, glm::vec3(15.0, 0.0, -10.0));
 
-	modelMatrixMayow = glm::translate(modelMatrixMayow, glm::vec3(13.0f, 0.05f, -5.0f));
-	modelMatrixMayow = glm::rotate(modelMatrixMayow, glm::radians(-90.0f), glm::vec3(0, 1, 0));
+	modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(13.0f, 0.05f, -5.0f));
+	modelMatrixPlayer = glm::rotate(modelMatrixPlayer, glm::radians(-90.0f), glm::vec3(0, 1, 0));
 
 	modelMatrixCowboy = glm::translate(modelMatrixCowboy, glm::vec3(13.0, 0.05, 0.0));
 
@@ -1774,6 +1976,22 @@ void applicationLoop() {
 	modelMatrixCyborg = glm::translate(modelMatrixCyborg, glm::vec3(5.0f, 0.05, 0.0f));
 
 	modelMatrixFountain = glm::translate(modelMatrixFountain, glm::vec3(5.0, 0.0, -40.0));
+
+	modelMatrixEntrada = glm::translate(modelMatrixEntrada, glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixEntrada = glm::rotate(modelMatrixEntrada, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixEntrada = glm::scale(modelMatrixEntrada, glm::vec3(0.5f));
+
+	modelMatrixSalida = glm::translate(modelMatrixSalida, glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixSalida = glm::rotate(modelMatrixSalida, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixSalida = glm::scale(modelMatrixSalida, glm::vec3(0.5f));
+
+	modelMatrixMuroDer = glm::translate(modelMatrixMuroDer, glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixMuroDer = glm::rotate(modelMatrixMuroDer, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixMuroDer = glm::scale(modelMatrixMuroDer, glm::vec3(0.5f));
+
+	modelMatrixMuroIzq = glm::translate(modelMatrixMuroIzq, glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixMuroIzq = glm::rotate(modelMatrixMuroIzq, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixMuroIzq = glm::scale(modelMatrixMuroIzq, glm::vec3(0.5f));
 
 	// Variables to interpolation key frames
 	fileName = "../animaciones/animation_dart_joints.txt";
@@ -1819,9 +2037,9 @@ void applicationLoop() {
 			target = modelMatrixDart[3];
 		}
 		else{
-			axis = glm::axis(glm::quat_cast(modelMatrixMayow));
-			angleTarget = glm::angle(glm::quat_cast(modelMatrixMayow));
-			target = modelMatrixMayow[3];
+			axis = glm::axis(glm::quat_cast(modelMatrixPlayer));
+			angleTarget = glm::angle(glm::quat_cast(modelMatrixPlayer));
+			target = modelMatrixPlayer[3];
 		}
 
 		if(std::isnan(angleTarget))
@@ -1873,10 +2091,10 @@ void applicationLoop() {
 		shaderTerrain.setMatrix4("lightSpaceMatrix", 1, false,
 				glm::value_ptr(lightSpaceMatrix));
 		// Settea la matriz de vista y projection al shader para el fountain
-		/*shaderParticlesFountain.setMatrix4("projection", 1, false,
+		shaderParticlesFountain.setMatrix4("projection", 1, false,
 				glm::value_ptr(projection));
 		shaderParticlesFountain.setMatrix4("view", 1, false,
-				glm::value_ptr(view));*/
+				glm::value_ptr(view));
 
 		/*******************************************
 		 * Propiedades de neblina
@@ -2106,21 +2324,33 @@ void applicationLoop() {
 			std::get<0>(collidersOBB.find("lamp2-" + std::to_string(i))->second) = lampCollider;
 		}
 
-		// Collider de mayow
-		AbstractModel::OBB mayowCollider;
-		glm::mat4 modelmatrixColliderMayow = glm::mat4(modelMatrixMayow);
-		modelmatrixColliderMayow = glm::rotate(modelmatrixColliderMayow,
-				glm::radians(-90.0f), glm::vec3(1, 0, 0));
-		// Set the orientation of collider before doing the scale
-		mayowCollider.u = glm::quat_cast(modelmatrixColliderMayow);
-		modelmatrixColliderMayow = glm::scale(modelmatrixColliderMayow, glm::vec3(0.021, 0.021, 0.021));
-		modelmatrixColliderMayow = glm::translate(modelmatrixColliderMayow,
-				glm::vec3(mayowModelAnimate.getObb().c.x,
-						mayowModelAnimate.getObb().c.y,
-						mayowModelAnimate.getObb().c.z));
-		mayowCollider.e = mayowModelAnimate.getObb().e * glm::vec3(0.021, 0.021, 0.021) * glm::vec3(0.787401574, 0.787401574, 0.787401574);
-		mayowCollider.c = glm::vec3(modelmatrixColliderMayow[3]);
-		addOrUpdateColliders(collidersOBB, "mayow", mayowCollider, modelMatrixMayow);
+		// Collider del player
+		AbstractModel::OBB playerCollider;
+		glm::mat4 modelmatrixColliderPlayer = glm::mat4(modelMatrixPlayer);
+
+		// Aplicar la misma rotacion visual que se usa en el render ANTES del scale
+		// El player usa rotate(180 Y) en lugar del rotate(-90 X) de Mayow
+		modelmatrixColliderPlayer = glm::rotate(modelmatrixColliderPlayer,
+			glm::radians(180.0f), glm::vec3(0, 1, 0));
+
+		// Extraer el quaternion ANTES del scale (igual que Mayow)
+		playerCollider.u = glm::quat_cast(modelmatrixColliderPlayer);
+
+		// Ahora si aplicar el scale (igual que Mayow usaba 0.021)
+		modelmatrixColliderPlayer = glm::scale(modelmatrixColliderPlayer,
+			glm::vec3(0.015f, 0.015f, 0.015f));
+
+		// Trasladar al centro local del OBB del modelo
+		modelmatrixColliderPlayer = glm::translate(modelmatrixColliderPlayer,
+			glm::vec3(playerModelAnimate.getObb().c.x,
+					playerModelAnimate.getObb().c.y,
+					playerModelAnimate.getObb().c.z));
+
+		// Half-extents con el mismo scale uniforme
+		playerCollider.e = playerModelAnimate.getObb().e * glm::vec3(0.0085f, 0.015f, 0.0085f);
+		playerCollider.c = glm::vec3(modelmatrixColliderPlayer[3]);
+
+		addOrUpdateColliders(collidersOBB, "player", playerCollider, modelMatrixPlayer);
 
 		/*******************************************
 		 * Render de colliders
@@ -2218,27 +2448,27 @@ void applicationLoop() {
 				if (!itCollision->second) 
 					addOrUpdateColliders(collidersOBB, itCollision->first);
 				else {
-					if (itCollision->first.compare("mayow") == 0)
-						modelMatrixMayow = std::get<1>(obbBuscado->second);
+					if (itCollision->first.compare("player") == 0)
+						modelMatrixPlayer = std::get<1>(obbBuscado->second);
 					if (itCollision->first.compare("dart") == 0)
 						modelMatrixDart = std::get<1>(obbBuscado->second);
 				}
 			}
 		}
 
-		glm::mat4 modelMatrixRayMay = glm::mat4(modelMatrixMayow);
-		modelMatrixRayMay = glm::translate(modelMatrixRayMay, glm::vec3(0, 1, 0));
+		glm::mat4 modelMatrixRayPlayer = glm::mat4(modelMatrixPlayer);
+		modelMatrixRayPlayer = glm::translate(modelMatrixRayPlayer, glm::vec3(0, 1, 0));
 		float maxDistanceRay = 10.0;
-		glm::vec3 rayDirection = modelMatrixRayMay[2];
-		glm::vec3 ori = modelMatrixRayMay[3];
+		glm::vec3 rayDirection = modelMatrixRayPlayer[2];
+		glm::vec3 ori = modelMatrixRayPlayer[3];
 		glm::vec3 rmd = ori + rayDirection * (maxDistanceRay / 2.0f);
 		glm::vec3 targetRay = ori + rayDirection * maxDistanceRay;
-		modelMatrixRayMay[3] = glm::vec4(rmd, 1.0);
-		modelMatrixRayMay = glm::rotate(modelMatrixRayMay, glm::radians(90.0f), 
+		modelMatrixRayPlayer[3] = glm::vec4(rmd, 1.0);
+		modelMatrixRayPlayer = glm::rotate(modelMatrixRayPlayer, glm::radians(90.0f), 
 			glm::vec3(1, 0, 0));
-		modelMatrixRayMay = glm::scale(modelMatrixRayMay, 
+		modelMatrixRayPlayer = glm::scale(modelMatrixRayPlayer, 
 			glm::vec3(0.05, maxDistanceRay, 0.05));
-		rayModel.render(modelMatrixRayMay);
+		rayModel.render(modelMatrixRayPlayer);
 
 		std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4>>::
 			iterator itSBB;
@@ -2260,18 +2490,18 @@ void applicationLoop() {
 		}*/
 
 		// Esto es para ilustrar la transformacion inversa de los coliders
-		/*glm::vec3 cinv = glm::inverse(mayowCollider.u) * glm::vec4(rockCollider.c, 1.0);
+		/*glm::vec3 cinv = glm::inverse(playerCollider.u) * glm::vec4(rockCollider.c, 1.0);
 		glm::mat4 invColliderS = glm::mat4(1.0);
 		invColliderS = glm::translate(invColliderS, cinv);
-		invColliderS =  invColliderS * glm::mat4(mayowCollider.u);
+		invColliderS =  invColliderS * glm::mat4(playerCollider.u);
 		invColliderS = glm::scale(invColliderS, glm::vec3(rockCollider.ratio * 2.0, rockCollider.ratio * 2.0, rockCollider.ratio * 2.0));
 		sphereCollider.setColor(glm::vec4(1.0, 1.0, 0.0, 1.0));
 		sphereCollider.enableWireMode();
 		sphereCollider.render(invColliderS);
-		glm::vec3 cinv2 = glm::inverse(mayowCollider.u) * glm::vec4(mayowCollider.c, 1.0);
+		glm::vec3 cinv2 = glm::inverse(playerCollider.u) * glm::vec4(playerCollider.c, 1.0);
 		glm::mat4 invColliderB = glm::mat4(1.0);
 		invColliderB = glm::translate(invColliderB, cinv2);
-		invColliderB = glm::scale(invColliderB, mayowCollider.e * 2.0f);
+		invColliderB = glm::scale(invColliderB, playerCollider.e * 2.0f);
 		boxCollider.setColor(glm::vec4(1.0, 1.0, 0.0, 1.0));
 		boxCollider.enableWireMode();
 		boxCollider.render(invColliderB);
@@ -2455,7 +2685,7 @@ void applicationLoop() {
 		// Constantes de animaciones
 		rotHelHelY += 0.5;
 		rotHelHelBack += 0.5;
-		animationMayowIndex = 1;
+		animationPlayerIndex = 0; // keep idle by default
 
 		glfwSwapBuffers(window);
 
@@ -2477,14 +2707,14 @@ void applicationLoop() {
 		source2Pos[2] = modelMatrixDart[3].z;
 		alSourcefv(source[2], AL_POSITION, source2Pos);
 
-		// Listener for the Thris person camera
-		listenerPos[0] = modelMatrixMayow[3].x;
-		listenerPos[1] = modelMatrixMayow[3].y;
-		listenerPos[2] = modelMatrixMayow[3].z;
+		// Listener for the Third person camera
+		listenerPos[0] = modelMatrixPlayer[3].x;
+		listenerPos[1] = modelMatrixPlayer[3].y;
+		listenerPos[2] = modelMatrixPlayer[3].z;
 		alListenerfv(AL_POSITION, listenerPos);
 
-		glm::vec3 upModel = glm::normalize(modelMatrixMayow[1]);
-		glm::vec3 frontModel = glm::normalize(modelMatrixMayow[2]);
+		glm::vec3 upModel = glm::normalize(modelMatrixPlayer[1]);
+		glm::vec3 frontModel = glm::normalize(modelMatrixPlayer[2]);
 
 		listenerOri[0] = frontModel.x;
 		listenerOri[1] = frontModel.y;

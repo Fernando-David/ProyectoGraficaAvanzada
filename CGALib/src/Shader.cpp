@@ -106,6 +106,8 @@ GLint Shader::getUniformLocation(std::string strVariable) {
 	return glGetUniformLocation(ShaderProgramId, strVariable.c_str());
 }
 
+
+
 void Shader::destroy() {
 	glUseProgram(0);
 
