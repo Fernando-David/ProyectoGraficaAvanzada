@@ -75,6 +75,8 @@ Shader shaderDepth;
 Shader shaderViewDepth;
 //Shader para las particulas de fountain
 Shader shaderParticlesFountain;
+//Shader para las particulas de fuego
+Shader shaderParticlesFire;
 
 std::shared_ptr<Camera> camera(new ThirdPersonCamera());
 float distanceFromTarget = 7.0;
@@ -155,6 +157,7 @@ GLuint textureTerrainRID, textureTerrainGID, textureTerrainBID, textureTerrainBl
 GLuint skyboxTextureID;
 GLuint textureInit1ID, textureInit2ID, textureActivaID, textureScreenID;
 GLuint textureParticleFountainID;
+GLuint textureParticleFireID;
 
 bool iniciaPartida = false, presionarOpcion = false;
 
@@ -276,7 +279,8 @@ std::map<std::string, glm::vec3> blendingUnsorted = {
 		{"aircraft", glm::vec3(10.0, 0.0, -17.5)},
 		{"lambo", glm::vec3(23.0, 0.0, 0.0)},
 		{"heli", glm::vec3(5.0, 10.0, -5.0)},
-		{"fountain", glm::vec3(0.0)}
+		{"fountain", glm::vec3(0.0)},
+		{"fire0",    antochaPositions[0]}   // una entrada por antorcha
 };
 
 double deltaTime;
@@ -336,6 +340,19 @@ GLuint VAOParticles;
 GLuint nParticles = 200;
 double currentTimeParticles, lastTimeParticles;
 
+// Variables para partículas de fuego, estilo fuente
+GLuint fireInitVel;
+GLuint fireStartTime;
+GLuint VAOParticlesFire;
+
+GLuint nParticlesFire = 300;
+float fireParticleLifetime = 3.0f;
+
+// OJO: usando GL_POINTS, este tamaño está en píxeles
+float fireParticleSize = 35.0f;
+
+double currentTimeFire, lastTimeFire;
+
 // Se definen todos las funciones.
 void reshapeCallback(GLFWwindow *Window, int widthRes, int heightRes);
 void keyCallback(GLFWwindow *window, int key, int scancode, int action,
@@ -344,6 +361,7 @@ void mouseCallback(GLFWwindow *window, double xpos, double ypos);
 void mouseButtonCallback(GLFWwindow *window, int button, int state, int mod);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 void initParticleBuffers();
+void initFireParticleBuffers();
 void init(int width, int height, std::string strTitle, bool bFullScreen);
 void destroy();
 bool processInput(bool continueApplication = true);
@@ -411,6 +429,79 @@ void initParticleBuffers(){
 
 }
 
+void initFireParticleBuffers() {
+    glGenBuffers(1, &fireInitVel);
+    glGenBuffers(1, &fireStartTime);
+
+    int sizeInitVel = nParticlesFire * 3 * sizeof(GLfloat);
+    int sizeStartTime = nParticlesFire * sizeof(GLfloat);
+
+    glBindBuffer(GL_ARRAY_BUFFER, fireInitVel);
+    glBufferData(GL_ARRAY_BUFFER, sizeInitVel, NULL, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, fireStartTime);
+    glBufferData(GL_ARRAY_BUFFER, sizeStartTime, NULL, GL_STATIC_DRAW);
+
+    // Velocidades iniciales, parecido a la fuente,
+    // pero con movimiento más vertical y con poca apertura lateral
+    GLfloat *data = new GLfloat[nParticlesFire * 3];
+
+    glm::vec3 v(0.0f);
+    float velocity;
+    float theta;
+    float phi;
+
+    for (unsigned int i = 0; i < nParticlesFire; i++) {
+        theta = glm::mix(0.0f, glm::pi<float>() / 10.0f, ((float)rand() / RAND_MAX));
+        phi = glm::mix(0.0f, glm::two_pi<float>(), ((float)rand() / RAND_MAX));
+
+        v.x = sinf(theta) * cosf(phi);
+        v.y = cosf(theta);
+        v.z = sinf(theta) * sinf(phi);
+
+        velocity = glm::mix(0.4f, 0.9f, ((float)rand() / RAND_MAX));
+        v = glm::normalize(v) * velocity;
+
+        data[3 * i] = v.x;
+        data[3 * i + 1] = v.y;
+        data[3 * i + 2] = v.z;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, fireInitVel);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeInitVel, data);
+    delete[] data;
+
+    // Tiempo inicial de cada partícula
+    data = new GLfloat[nParticlesFire];
+
+    float time = 0.0f;
+    float rate = fireParticleLifetime / nParticlesFire;
+
+    for (unsigned int i = 0; i < nParticlesFire; i++) {
+        data[i] = time;
+        time += rate;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, fireStartTime);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeStartTime, data);
+    delete[] data;
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glGenVertexArrays(1, &VAOParticlesFire);
+    glBindVertexArray(VAOParticlesFire);
+
+    glBindBuffer(GL_ARRAY_BUFFER, fireInitVel);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, fireStartTime);
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
 // Implementacion de todas las funciones.
 void init(int width, int height, std::string strTitle, bool bFullScreen) {
 
@@ -464,6 +555,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	glEnable(GL_PROGRAM_POINT_SIZE);
 
 	// Inicialización de los shaders
 	shader.initialize("../Shaders/colorShader.vs", "../Shaders/colorShader.fs");
@@ -474,6 +566,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	shaderViewDepth.initialize("../Shaders/texturizado.vs", "../Shaders/texturizado_depth_view.fs");
 	shaderDepth.initialize("../Shaders/shadow_mapping_depth.vs", "../Shaders/shadow_mapping_depth.fs");
 	shaderParticlesFountain.initialize("../Shaders/particlesFountain.vs", "../Shaders/particlesFountain.fs");
+	shaderParticlesFire.initialize("../Shaders/particlesFire.vs", "../Shaders/particlesFire.fs");
 
 	// Inicializacion de los objetos.
 	skyboxSphere.init();
@@ -948,6 +1041,26 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		std::cout << "Fallo la carga de textura" << std::endl;
 	textureParticlesFountain.freeImage(); // Liberamos memoria
 
+	// Definiendo la textura de fuego
+	Texture textureParticlesFire("../Textures/fire.png"); 
+	textureParticlesFire.loadImage();
+	glGenTextures(1, &textureParticleFireID);
+	glBindTexture(GL_TEXTURE_2D, textureParticleFireID);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	if (textureParticlesFire.getData()) {
+		glTexImage2D(GL_TEXTURE_2D, 0,
+			textureParticlesFire.getChannels() == 3 ? GL_RGB : GL_RGBA,
+			textureParticlesFire.getWidth(), textureParticlesFire.getHeight(), 0,
+			textureParticlesFire.getChannels() == 3 ? GL_RGB : GL_RGBA,
+			GL_UNSIGNED_BYTE, textureParticlesFire.getData());
+		glGenerateMipmap(GL_TEXTURE_2D);
+	} else
+		std::cout << "Fallo la carga de textura de fuego" << std::endl;
+	textureParticlesFire.freeImage();
+
 	/*******************************************
 	 * OpenAL init
 	 *******************************************/
@@ -1031,6 +1144,9 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 
 	//inicializacion de los datos de la particula de agua
 	initParticleBuffers();
+	//inicializacion de los datos de la particula de fuego
+	initFireParticleBuffers();
+	lastTimeFire = TimeManager::Instance().GetTime();
 }
 
 void destroy() {
@@ -1045,6 +1161,7 @@ void destroy() {
 	shaderSkybox.destroy();
 	shaderTerrain.destroy();
 	shaderParticlesFountain.destroy();
+	shaderParticlesFire.destroy();
 
 	// Basic objects Delete
 	skyboxSphere.destroy();
@@ -1116,6 +1233,7 @@ void destroy() {
 	glDeleteTextures(1, &textureInit2ID);
 	glDeleteTextures(1, &textureScreenID);
 	glDeleteTextures(1, &textureParticleFountainID);
+	glDeleteTextures(1, &textureParticleFireID);
 
 	// Cube Maps Delete
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
@@ -1127,6 +1245,10 @@ void destroy() {
 	glDeleteBuffers(1, &startTime);
 	glBindVertexArray(0);
 	glDeleteVertexArrays(1, &VAOParticles);
+	// Liberar los datos del buffer de las particulas de fuego
+	glDeleteBuffers(1, &fireInitVel);
+	glDeleteBuffers(1, &fireStartTime);
+	glDeleteVertexArrays(1, &VAOParticlesFire);
 
 }
 
@@ -1853,6 +1975,7 @@ void renderAlphaScene(bool render = true){
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
+	
 	for(std::map<float, std::pair<std::string, glm::vec3> >::reverse_iterator it = blendingSorted.rbegin(); it != blendingSorted.rend(); it++){
 		if(it->second.first.compare("aircraft") == 0){
 			// Render for the aircraft model
@@ -1913,6 +2036,55 @@ void renderAlphaScene(bool render = true){
 			glDrawArrays(GL_POINTS, 0, nParticles);
 			glDepthMask(GL_TRUE);
 			shaderParticlesFountain.turnOff();
+		}
+		else if (render && it->second.first.compare("fire0") == 0) {
+			glm::mat4 modelMatrixFire = glm::mat4(1.0f);
+			modelMatrixFire = glm::translate(modelMatrixFire, it->second.second);
+
+			// Ajusta esta altura según el modelo de tu antorcha
+			modelMatrixFire[3][1] = terrain.getHeightTerrain(
+				modelMatrixFire[3][0],
+				modelMatrixFire[3][2]
+			) + 2.0f;
+
+			currentTimeFire = TimeManager::Instance().GetTime();
+
+			if (currentTimeFire - lastTimeFire > fireParticleLifetime) {
+				lastTimeFire = currentTimeFire;
+			}
+
+			glDepthMask(GL_FALSE);
+
+			shaderParticlesFire.turnOn();
+
+			shaderParticlesFire.setFloat("Time", float(currentTimeFire - lastTimeFire));
+			shaderParticlesFire.setFloat("ParticleLifetime", fireParticleLifetime);
+			shaderParticlesFire.setFloat("ParticleSize", fireParticleSize);
+			shaderParticlesFire.setInt("ParticleTex", 0);
+
+			// Movimiento hacia arriba
+			shaderParticlesFire.setVectorFloat3(
+				"Accel",
+				glm::value_ptr(glm::vec3(0.0f, 0.25f, 0.0f))
+			);
+
+			shaderParticlesFire.setMatrix4(
+				"model",
+				1,
+				false,
+				glm::value_ptr(modelMatrixFire)
+			);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, textureParticleFireID);
+
+			glBindVertexArray(VAOParticlesFire);
+			glDrawArrays(GL_POINTS, 0, nParticlesFire);
+			glBindVertexArray(0);
+
+			shaderParticlesFire.turnOff();
+
+			glDepthMask(GL_TRUE);
 		}
 	}
 	glEnable(GL_CULL_FACE);
@@ -2095,6 +2267,11 @@ void applicationLoop() {
 				glm::value_ptr(projection));
 		shaderParticlesFountain.setMatrix4("view", 1, false,
 				glm::value_ptr(view));
+		// Settea la matriz de vista y projection al shader para el fuego
+		shaderParticlesFire.setMatrix4("projection", 1, false, 
+			glm::value_ptr(projection));
+		shaderParticlesFire.setMatrix4("view", 1, false, 
+			glm::value_ptr(view));
 
 		/*******************************************
 		 * Propiedades de neblina
