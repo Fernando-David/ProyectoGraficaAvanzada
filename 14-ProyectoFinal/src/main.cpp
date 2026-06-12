@@ -160,6 +160,12 @@ Model modelMoneda2;
 Model modelMoneda3;
 Model modelMoneda4;
 Model modelMoneda5;
+// Enemigos
+Model modelEnemy1;
+Model modelEnemy2;
+Model modelEnemy3;
+Model modelEnemy4;
+Model modelEnemy5;
 // Modelos animados
 // Player (replaces Mayow)
 Model playerModelAnimate;
@@ -249,8 +255,16 @@ glm::mat4 modelMatrixMoneda2 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda3 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda4 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda5 = glm::mat4(1.0f);
+glm::mat4 modelMatrixEnemy1 = glm::mat4(1.0f);
+glm::mat4 modelMatrixEnemy2 = glm::mat4(1.0f);
+glm::mat4 modelMatrixEnemy3 = glm::mat4(1.0f);
+glm::mat4 modelMatrixEnemy4 = glm::mat4(1.0f);
+glm::mat4 modelMatrixEnemy5 = glm::mat4(1.0f);
 std::vector<bool> monedasActivas = { true, true, true, true, true };
 int contadorMonedas = 0;
+int vidasJugador = 3;
+double ultimoDanioJugador = -10.0;
+const double TIEMPO_INVULNERABILIDAD = 1.0;
 bool puertasAbiertas = false;
 bool juegoGanado = false;
 AbstractModel::AABB triggerPuertaIzq;
@@ -353,6 +367,7 @@ std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4> > col
 std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4> > collidersSBB;
 std::map<std::string, AbstractModel::AABB> collidersMonedasAABB;
 std::map<std::string, AbstractModel::AABB> collidersMurosAABB;
+std::map<std::string, AbstractModel::OBB> collidersEnemigosOBB;
 
 // Variables animacion maquina de estados eclipse
 const float avance = 0.1;
@@ -427,6 +442,8 @@ AbstractModel::AABB transformAABB(const AbstractModel::AABB &aabb,
 AbstractModel::AABB obbToAABB(const AbstractModel::OBB &obb);
 bool testAABBAABB(const AbstractModel::AABB &a,
 		const AbstractModel::AABB &b);
+AbstractModel::OBB createModelOBB(
+		Model &model, const glm::mat4 &modelMatrix, float scale);
 
 AbstractModel::AABB transformAABB(const AbstractModel::AABB &aabb,
 		const glm::mat4 &transform) {
@@ -463,6 +480,40 @@ bool testAABBAABB(const AbstractModel::AABB &a,
 	return a.mins.x <= b.maxs.x && a.maxs.x >= b.mins.x
 			&& a.mins.y <= b.maxs.y && a.maxs.y >= b.mins.y
 			&& a.mins.z <= b.maxs.z && a.maxs.z >= b.mins.z;
+}
+
+AbstractModel::OBB createModelOBB(
+		Model &model, const glm::mat4 &modelMatrix, float scale) {
+	AbstractModel::OBB collider;
+	const AbstractModel::OBB &localCollider = model.getObb();
+	bool validCollider =
+		std::isfinite(localCollider.c.x)
+		&& std::isfinite(localCollider.c.y)
+		&& std::isfinite(localCollider.c.z)
+		&& std::isfinite(localCollider.e.x)
+		&& std::isfinite(localCollider.e.y)
+		&& std::isfinite(localCollider.e.z)
+		&& localCollider.e.x > 0.0f
+		&& localCollider.e.y > 0.0f
+		&& localCollider.e.z > 0.0f
+		&& localCollider.e.x < 10000.0f
+		&& localCollider.e.y < 10000.0f
+		&& localCollider.e.z < 10000.0f;
+
+	collider.u = glm::quat_cast(modelMatrix);
+	if (validCollider) {
+		glm::mat4 colliderMatrix = glm::scale(
+			modelMatrix, glm::vec3(scale));
+		colliderMatrix = glm::translate(
+			colliderMatrix, localCollider.c);
+		collider.c = glm::vec3(colliderMatrix[3]);
+		collider.e = localCollider.e * glm::vec3(scale);
+	} else {
+		collider.c = glm::vec3(modelMatrix[3])
+				+ glm::vec3(0.0f, 1.0f, 0.0f);
+		collider.e = glm::vec3(0.65f, 1.0f, 0.5f);
+	}
+	return collider;
 }
 
 void initParticleBuffers(){
@@ -819,6 +870,13 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelMoneda3.loadModel("../models/Laberinto/Moneda3.obj"); modelMoneda3.setShader(&shaderMulLighting);
 	modelMoneda4.loadModel("../models/Laberinto/Moneda4.obj"); modelMoneda4.setShader(&shaderMulLighting);
 	modelMoneda5.loadModel("../models/Laberinto/Moneda5.obj"); modelMoneda5.setShader(&shaderMulLighting);
+
+	// Enemigos
+	modelEnemy1.loadModel("../models/Enemy/Enemy1.fbx"); modelEnemy1.setShader(&shaderMulLighting);
+	modelEnemy2.loadModel("../models/Enemy/Enemy2.fbx"); modelEnemy2.setShader(&shaderMulLighting);
+	modelEnemy3.loadModel("../models/Enemy/Enemy3.fbx"); modelEnemy3.setShader(&shaderMulLighting);
+	modelEnemy4.loadModel("../models/Enemy/Enemy4.fbx"); modelEnemy4.setShader(&shaderMulLighting);
+	modelEnemy5.loadModel("../models/Enemy/Enemy5.fbx"); modelEnemy5.setShader(&shaderMulLighting);
 
 	// Player
 	playerModelAnimate.loadModel("../models/Player/Player.fbx");
@@ -1340,6 +1398,11 @@ void destroy() {
 	modelMoneda3.destroy();
 	modelMoneda4.destroy();
 	modelMoneda5.destroy();
+	modelEnemy1.destroy();
+	modelEnemy2.destroy();
+	modelEnemy3.destroy();
+	modelEnemy4.destroy();
+	modelEnemy5.destroy();
 	playerModelAnimate.destroy();
 	cowboyModelAnimate.destroy();
 	guardianModelAnimate.destroy();
@@ -1799,6 +1862,12 @@ void prepareScene(){
 	modelMoneda3.setShader(&shaderMulLighting);
 	modelMoneda4.setShader(&shaderMulLighting);
 	modelMoneda5.setShader(&shaderMulLighting);
+
+	modelEnemy1.setShader(&shaderMulLighting);
+	modelEnemy2.setShader(&shaderMulLighting);
+	modelEnemy3.setShader(&shaderMulLighting);
+	modelEnemy4.setShader(&shaderMulLighting);
+	modelEnemy5.setShader(&shaderMulLighting);
 }
 
 void prepareDepthScene(){
@@ -1875,6 +1944,12 @@ void prepareDepthScene(){
 	modelMoneda3.setShader(&shaderDepth);
 	modelMoneda4.setShader(&shaderDepth);
 	modelMoneda5.setShader(&shaderDepth);
+
+	modelEnemy1.setShader(&shaderDepth);
+	modelEnemy2.setShader(&shaderDepth);
+	modelEnemy3.setShader(&shaderDepth);
+	modelEnemy4.setShader(&shaderDepth);
+	modelEnemy5.setShader(&shaderDepth);
 }
 
 void renderSolidScene(){
@@ -2065,6 +2140,29 @@ void renderSolidScene(){
 	playerModelAnimate.setAnimationIndex(animationPlayerIndex);
 	playerModelAnimate.render(modelMatrixPlayerBody);
 	//animationPlayerIndex = 1;
+
+	// Enemigos
+	modelMatrixEnemy1[3][1] = terrain.getHeightTerrain(
+		modelMatrixEnemy1[3][0], modelMatrixEnemy1[3][2]);
+	modelMatrixEnemy2[3][1] = terrain.getHeightTerrain(
+		modelMatrixEnemy2[3][0], modelMatrixEnemy2[3][2]);
+	modelMatrixEnemy3[3][1] = terrain.getHeightTerrain(
+		modelMatrixEnemy3[3][0], modelMatrixEnemy3[3][2]);
+	modelMatrixEnemy4[3][1] = terrain.getHeightTerrain(
+		modelMatrixEnemy4[3][0], modelMatrixEnemy4[3][2]);
+	modelMatrixEnemy5[3][1] = terrain.getHeightTerrain(
+		modelMatrixEnemy5[3][0], modelMatrixEnemy5[3][2]);
+
+	modelEnemy1.setAnimationIndex(0);
+	modelEnemy2.setAnimationIndex(0);
+	modelEnemy3.setAnimationIndex(0);
+	modelEnemy4.setAnimationIndex(0);
+	modelEnemy5.setAnimationIndex(0);
+	modelEnemy1.render(glm::scale(modelMatrixEnemy1, glm::vec3(0.01f)));
+	modelEnemy2.render(glm::scale(modelMatrixEnemy2, glm::vec3(0.01f)));
+	modelEnemy3.render(glm::scale(modelMatrixEnemy3, glm::vec3(0.01f)));
+	modelEnemy4.render(glm::scale(modelMatrixEnemy4, glm::vec3(0.01f)));
+	modelEnemy5.render(glm::scale(modelMatrixEnemy5, glm::vec3(0.01f)));
 
 	modelMatrixCowboy[3][1] = terrain.getHeightTerrain(modelMatrixCowboy[3][0], modelMatrixCowboy[3][2]);
 	glm::mat4 modelMatrixCowboyBody = glm::mat4(modelMatrixCowboy);
@@ -2298,7 +2396,9 @@ void renderAlphaScene(bool render = true){
 		boxIntro.render();
 		glDisable(GL_BLEND);
 
-		//modelText->render("Texto en OpenGL", -1, 0);
+		modelText->render(
+			"Vidas: " + std::to_string(vidasJugador),
+			-0.95f, 0.88f, 28.0f, 1.0f, 1.0f, 1.0f);
 	}
 }
 
@@ -2336,6 +2436,17 @@ void applicationLoop() {
 
 	modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0f, 0.05f, -70.0f));
 	modelMatrixPlayer = glm::rotate(modelMatrixPlayer, glm::radians(-90.0f), glm::vec3(0, 1, 0));
+
+	modelMatrixEnemy1 = glm::translate(
+		modelMatrixEnemy1, glm::vec3(25.0f, 0.0f, -20.0f));
+	modelMatrixEnemy2 = glm::translate(
+		modelMatrixEnemy2, glm::vec3(-20.0f, 0.0f, -40.0f));
+	modelMatrixEnemy3 = glm::translate(
+		modelMatrixEnemy3, glm::vec3(35.0f, 0.0f, -65.0f));
+	modelMatrixEnemy4 = glm::translate(
+		modelMatrixEnemy4, glm::vec3(-35.0f, 0.0f, -85.0f));
+	modelMatrixEnemy5 = glm::translate(
+		modelMatrixEnemy5, glm::vec3(10.0f, 0.0f, -110.0f));
 
 	modelMatrixCowboy = glm::translate(modelMatrixCowboy, glm::vec3(13.0, 0.05, 0.0));
 
@@ -2834,6 +2945,18 @@ void applicationLoop() {
 
 		addOrUpdateColliders(collidersOBB, "player", playerCollider, modelMatrixPlayer);
 
+		collidersEnemigosOBB.clear();
+		collidersEnemigosOBB["Enemy-1"] = createModelOBB(
+			modelEnemy1, modelMatrixEnemy1, 0.01f);
+		collidersEnemigosOBB["Enemy-2"] = createModelOBB(
+			modelEnemy2, modelMatrixEnemy2, 0.01f);
+		collidersEnemigosOBB["Enemy-3"] = createModelOBB(
+			modelEnemy3, modelMatrixEnemy3, 0.01f);
+		collidersEnemigosOBB["Enemy-4"] = createModelOBB(
+			modelEnemy4, modelMatrixEnemy4, 0.01f);
+		collidersEnemigosOBB["Enemy-5"] = createModelOBB(
+			modelEnemy5, modelMatrixEnemy5, 0.01f);
+
 		// Colliders AABB de monedas. La etiqueta "Moneda-" permite
 		// distinguir objetos recolectables de los obstaculos del escenario.
 		collidersMonedasAABB.clear();
@@ -2969,6 +3092,19 @@ void applicationLoop() {
 			boxCollider.render(matrixCollider);
 		}
 
+		for (std::map<std::string, AbstractModel::OBB>::iterator it =
+				collidersEnemigosOBB.begin();
+				it != collidersEnemigosOBB.end(); it++) {
+			glm::mat4 matrixCollider = glm::translate(
+				glm::mat4(1.0f), it->second.c);
+			matrixCollider = matrixCollider * glm::mat4(it->second.u);
+			matrixCollider = glm::scale(
+				matrixCollider, it->second.e * 2.0f);
+			boxCollider.setColor(glm::vec4(1.0, 0.45, 0.0, 1.0));
+			boxCollider.enableWireMode();
+			boxCollider.render(matrixCollider);
+		}
+
 		if (puertasAbiertas) {
 			AbstractModel::AABB triggersPuertas[2] = {
 				triggerPuertaIzq, triggerPuertaDer
@@ -2993,6 +3129,26 @@ void applicationLoop() {
 
 		/*********************Prueba de colisiones****************************/
 		AbstractModel::AABB playerAABB = obbToAABB(playerCollider);
+		if (vidasJugador > 0
+				&& currTime - ultimoDanioJugador
+					>= TIEMPO_INVULNERABILIDAD) {
+			for (std::map<std::string, AbstractModel::OBB>::iterator it =
+					collidersEnemigosOBB.begin();
+					it != collidersEnemigosOBB.end(); it++) {
+				if (testOBBOBB(playerCollider, it->second)) {
+					vidasJugador--;
+					ultimoDanioJugador = currTime;
+					std::cout << it->first
+							<< " hizo danio al jugador. Vidas restantes: "
+							<< vidasJugador << std::endl;
+					if (vidasJugador == 0)
+						std::cout << "El jugador se ha quedado sin vidas."
+								<< std::endl;
+					break;
+				}
+			}
+		}
+
 		for (std::map<std::string, AbstractModel::AABB>::iterator it =
 				collidersMonedasAABB.begin();
 				it != collidersMonedasAABB.end(); it++) {
