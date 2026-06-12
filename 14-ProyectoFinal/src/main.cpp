@@ -93,6 +93,7 @@ Box boxCollider;
 Sphere sphereCollider(10, 10);
 Cylinder rayModel(10, 10, 1.0, 1.0, 1.0);
 Box boxIntro;
+Box boxHeart;
 Box boxViewDepth;
 // Models complex instances
 Model modelRock;
@@ -187,7 +188,9 @@ ShadowBox * shadowBox;
 GLuint textureCespedID, textureWallID, textureWindowID, textureHighwayID, textureLandingPadID;
 GLuint textureTerrainRID, textureTerrainGID, textureTerrainBID, textureTerrainBlendMapID;
 GLuint skyboxTextureID;
-GLuint textureInit1ID, textureInit2ID, textureActivaID, textureScreenID;
+GLuint textureInit1ID, textureInit2ID, textureActivaID;
+GLuint textureScreenID, textureScreen1LifeID, textureScreen0LivesID;
+GLuint textureHeartID;
 GLuint textureParticleFountainID;
 GLuint textureParticleFireID;
 
@@ -754,6 +757,9 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	boxIntro.setShader(&shaderTexture);
 	boxIntro.setScale(glm::vec3(2.0, 2.0, 1.0));
 
+	boxHeart.init();
+	boxHeart.setShader(&shaderTexture);
+
 	boxViewDepth.init();
 	boxViewDepth.setShader(&shaderViewDepth);
 
@@ -1201,10 +1207,85 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		glTexImage2D(GL_TEXTURE_2D, 0, textureScreen.getChannels() == 3 ? GL_RGB : GL_RGBA, textureScreen.getWidth(), textureScreen.getHeight(), 0,
 		textureScreen.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureScreen.getData());
 		glGenerateMipmap(GL_TEXTURE_2D);
+
+		int width = textureScreen.getWidth();
+		int height = textureScreen.getHeight();
+		int channels = textureScreen.getChannels();
+		int dataSize = width * height * channels;
+		std::vector<unsigned char> screen1Life(
+			textureScreen.getData(), textureScreen.getData() + dataSize);
+		std::vector<unsigned char> screen0Lives = screen1Life;
+
+		auto clearHudRegion = [width, height, channels](
+				std::vector<unsigned char> &pixels,
+				int minX, int maxX, int minY, int maxY) {
+			minX = glm::clamp(minX, 0, width);
+			maxX = glm::clamp(maxX, 0, width);
+			minY = glm::clamp(minY, 0, height);
+			maxY = glm::clamp(maxY, 0, height);
+			for (int y = minY; y < maxY; y++) {
+				for (int x = minX; x < maxX; x++) {
+					int pixelIndex = (y * width + x) * channels;
+					for (int channel = 0; channel < channels; channel++)
+						pixels[pixelIndex + channel] = 0;
+				}
+			}
+		};
+
+		clearHudRegion(screen1Life,
+			static_cast<int>(width * 0.88f), width,
+			0, static_cast<int>(height * 0.13f));
+		clearHudRegion(screen0Lives,
+			static_cast<int>(width * 0.76f), width,
+			0, static_cast<int>(height * 0.13f));
+
+		auto uploadHudTexture = [width, height, channels](
+				GLuint &textureID,
+				const std::vector<unsigned char> &pixels) {
+			glGenTextures(1, &textureID);
+			glBindTexture(GL_TEXTURE_2D, textureID);
+			glTexParameteri(
+				GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(
+				GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTexParameteri(
+				GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(
+				GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			GLenum format = channels == 3 ? GL_RGB : GL_RGBA;
+			glTexImage2D(
+				GL_TEXTURE_2D, 0, format, width, height, 0,
+				format, GL_UNSIGNED_BYTE, pixels.data());
+			glGenerateMipmap(GL_TEXTURE_2D);
+		};
+
+		uploadHudTexture(textureScreen1LifeID, screen1Life);
+		uploadHudTexture(textureScreen0LivesID, screen0Lives);
 	}
 	else 
 		std::cout << "Fallo la carga de textura" << std::endl;
 	textureScreen.freeImage(); // Liberamos memoria
+
+	Texture textureHeart("../Textures/Corazon.png");
+	textureHeart.loadImage();
+	glGenTextures(1, &textureHeartID);
+	glBindTexture(GL_TEXTURE_2D, textureHeartID);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	if (textureHeart.getData()) {
+		GLenum heartFormat =
+			textureHeart.getChannels() == 3 ? GL_RGB : GL_RGBA;
+		glTexImage2D(
+			GL_TEXTURE_2D, 0, heartFormat,
+			textureHeart.getWidth(), textureHeart.getHeight(), 0,
+			heartFormat, GL_UNSIGNED_BYTE, textureHeart.getData());
+		glGenerateMipmap(GL_TEXTURE_2D);
+	} else {
+		std::cout << "Fallo la carga de Corazon.png" << std::endl;
+	}
+	textureHeart.freeImage();
 
 	// Definiendo la textura
 	Texture textureParticlesFountain("../Textures/bluewater.png");
@@ -1358,6 +1439,7 @@ void destroy() {
 	sphereCollider.destroy();
 	rayModel.destroy();
 	boxIntro.destroy();
+	boxHeart.destroy();
 	boxViewDepth.destroy();
 
 	// Custom objects Delete
@@ -1426,6 +1508,9 @@ void destroy() {
 	glDeleteTextures(1, &textureInit1ID);
 	glDeleteTextures(1, &textureInit2ID);
 	glDeleteTextures(1, &textureScreenID);
+	glDeleteTextures(1, &textureScreen1LifeID);
+	glDeleteTextures(1, &textureScreen0LivesID);
+	glDeleteTextures(1, &textureHeartID);
 	glDeleteTextures(1, &textureParticleFountainID);
 	glDeleteTextures(1, &textureParticleFireID);
 
@@ -2390,14 +2475,24 @@ void renderAlphaScene(bool render = true){
 		shaderTexture.setMatrix4("projection", 1, false, glm::value_ptr(glm::mat4(1.0)));
 		shaderTexture.setMatrix4("view", 1, false, glm::value_ptr(glm::mat4(1.0)));
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, textureActivaID);
+		glBindTexture(GL_TEXTURE_2D, textureScreen0LivesID);
 		shaderTexture.setInt("outTexture", 0);
 		glEnable(GL_BLEND);
 		boxIntro.render();
+
+		glBindTexture(GL_TEXTURE_2D, textureHeartID);
+		for (int i = 0; i < vidasJugador; i++) {
+			glm::mat4 heartMatrix = glm::translate(
+				glm::mat4(1.0f),
+				glm::vec3(0.68f + i * 0.14f, 0.86f, 0.0f));
+			heartMatrix = glm::scale(
+				heartMatrix, glm::vec3(0.12f, 0.12f, 0.05f));
+			boxHeart.render(heartMatrix);
+		}
 		glDisable(GL_BLEND);
 
 		modelText->render(
-			"Vidas: " + std::to_string(vidasJugador),
+			"Monedas: " + std::to_string(contadorMonedas),
 			-0.95f, 0.88f, 28.0f, 1.0f, 1.0f, 1.0f);
 	}
 }
@@ -2438,15 +2533,18 @@ void applicationLoop() {
 	modelMatrixPlayer = glm::rotate(modelMatrixPlayer, glm::radians(-90.0f), glm::vec3(0, 1, 0));
 
 	modelMatrixEnemy1 = glm::translate(
-		modelMatrixEnemy1, glm::vec3(25.0f, 0.0f, -20.0f));
+		modelMatrixEnemy1, glm::vec3(-60.0f, 0.0f, 67.5f));// area es el que esta en la esquina superior derecha
 	modelMatrixEnemy2 = glm::translate(
-		modelMatrixEnemy2, glm::vec3(-20.0f, 0.0f, -40.0f));
+		modelMatrixEnemy2, glm::vec3(67.5f, 0.0f, 67.5f));// area es el que esta en la esquina superior derecha
 	modelMatrixEnemy3 = glm::translate(
-		modelMatrixEnemy3, glm::vec3(35.0f, 0.0f, -65.0f));
+		modelMatrixEnemy3, glm::vec3(12.5f, 0.0f, 45.0f)); // area es el que esta en la esquina inferior derecha
 	modelMatrixEnemy4 = glm::translate(
-		modelMatrixEnemy4, glm::vec3(-35.0f, 0.0f, -85.0f));
+		modelMatrixEnemy4, glm::vec3(-70.0f, 0.0f, 32.5f));// area es el que esta en la esquina inferior izquierda
 	modelMatrixEnemy5 = glm::translate(
-		modelMatrixEnemy5, glm::vec3(10.0f, 0.0f, -110.0f));
+		modelMatrixEnemy5, glm::vec3(-67.5f, 0.0f, -67.5f)); //Aerea es el que esta en la esquina superior izquierda
+	modelMatrixEnemy5 = glm::rotate(
+		modelMatrixEnemy5, glm::radians(-90.0f),
+		glm::vec3(0.0f, 1.0f, 0.0f));
 
 	modelMatrixCowboy = glm::translate(modelMatrixCowboy, glm::vec3(13.0, 0.05, 0.0));
 
