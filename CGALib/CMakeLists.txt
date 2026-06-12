@@ -4,6 +4,7 @@ file(GLOB CGALib_SRC
      "./include/Headers/*.h"
      "./src/*.cpp"
 )
+list(APPEND CGALib_SRC "./src/AerialCamera.cpp")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
      include_directories(

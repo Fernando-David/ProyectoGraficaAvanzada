@@ -22,6 +22,7 @@
 #include "Headers/Box.h"
 #include "Headers/FirstPersonCamera.h"
 #include "Headers/ThirdPersonCamera.h"
+#include "Headers/AerialCamera.h"
 
 // Font rendering include
 #include "Headers/FontTypeRendering.h"
@@ -132,8 +133,26 @@ Model modelLampPost2;
 // Laberinto models
 Model modelEntrada;
 Model modelSalida;
+Model modelPuertaDer;
+Model modelPuertaIzq;
 Model modelMuroDer;
 Model modelMuroIzq;
+// Laberinto additional walls
+Model modelMuro1;
+Model modelMuro2;
+Model modelMuro3;
+Model modelMuro4;
+Model modelMuro5;
+Model modelMuro6;
+Model modelMuro7;
+Model modelMuro8;
+Model modelMuro9;
+Model modelMuro10;
+Model modelMuro11;
+Model modelMuro12;
+Model modelMuro13;
+Model modelMuro14;
+Model modelMuro15;
 // Modelos animados
 // Player (replaces Mayow)
 Model playerModelAnimate;
@@ -198,8 +217,26 @@ glm::mat4 modelMatrixCyborg = glm::mat4(1.0f);
 glm::mat4 modelMatrixFountain = glm::mat4(1.0f);
 glm::mat4 modelMatrixEntrada = glm::mat4(1.0f);
 glm::mat4 modelMatrixSalida = glm::mat4(1.0f);
+glm::mat4 modelMatrixPuertaDer = glm::mat4(1.0f);
+glm::mat4 modelMatrixPuertaIzq = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuroDer = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuroIzq = glm::mat4(1.0f);
+// matrices for laberinto walls
+glm::mat4 modelMatrixMuro1 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro2 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro3 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro4 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro5 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro6 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro7 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro8 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro9 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro10 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro11 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro12 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro13 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro14 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMuro15 = glm::mat4(1.0f);
 // Antocha positions
 std::vector<glm::vec3> antochaPositions = {
 	glm::vec3(0.0f, 1.0f, 0.0f),
@@ -689,10 +726,30 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelEntrada.setShader(&shaderMulLighting);
 	modelSalida.loadModel("../models/Laberinto/Salida.obj");
 	modelSalida.setShader(&shaderMulLighting);
+    // Puertas del laberinto
+    modelPuertaDer.loadModel("../models/Laberinto/PuertaDer.obj"); modelPuertaDer.setShader(&shaderMulLighting);
+    modelPuertaIzq.loadModel("../models/Laberinto/PuertaIzq.obj"); modelPuertaIzq.setShader(&shaderMulLighting);
 	modelMuroDer.loadModel("../models/Laberinto/MuroDer.obj");
 	modelMuroDer.setShader(&shaderMulLighting);
 	modelMuroIzq.loadModel("../models/Laberinto/MuroIzq.obj");
 	modelMuroIzq.setShader(&shaderMulLighting);
+
+	// Load additional muro models
+	modelMuro1.loadModel("../models/Laberinto/Muro1.obj"); modelMuro1.setShader(&shaderMulLighting);
+	modelMuro2.loadModel("../models/Laberinto/Muro2.obj"); modelMuro2.setShader(&shaderMulLighting);
+	modelMuro3.loadModel("../models/Laberinto/Muro3.obj"); modelMuro3.setShader(&shaderMulLighting);
+	modelMuro4.loadModel("../models/Laberinto/Muro4.obj"); modelMuro4.setShader(&shaderMulLighting);
+	modelMuro5.loadModel("../models/Laberinto/Muro5.obj"); modelMuro5.setShader(&shaderMulLighting);
+	modelMuro6.loadModel("../models/Laberinto/Muro6.obj"); modelMuro6.setShader(&shaderMulLighting);
+	modelMuro7.loadModel("../models/Laberinto/Muro7.obj"); modelMuro7.setShader(&shaderMulLighting);
+	modelMuro8.loadModel("../models/Laberinto/Muro8.obj"); modelMuro8.setShader(&shaderMulLighting);
+	modelMuro9.loadModel("../models/Laberinto/Muro9.obj"); modelMuro9.setShader(&shaderMulLighting);
+	modelMuro10.loadModel("../models/Laberinto/Muro10.obj"); modelMuro10.setShader(&shaderMulLighting);
+	modelMuro11.loadModel("../models/Laberinto/Muro11.obj"); modelMuro11.setShader(&shaderMulLighting);
+	modelMuro12.loadModel("../models/Laberinto/Muro12.obj"); modelMuro12.setShader(&shaderMulLighting);
+	modelMuro13.loadModel("../models/Laberinto/Muro13.obj"); modelMuro13.setShader(&shaderMulLighting);
+	modelMuro14.loadModel("../models/Laberinto/Muro14.obj"); modelMuro14.setShader(&shaderMulLighting);
+	modelMuro15.loadModel("../models/Laberinto/Muro15.obj"); modelMuro15.setShader(&shaderMulLighting);
 
 	// Player
 	playerModelAnimate.loadModel("../models/Player/Player.fbx");
@@ -1375,7 +1432,7 @@ bool processInput(bool continueApplication) {
 	if (enableCountSelected && glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS){
 		enableCountSelected = false;
 		modelSelected++;
-		if(modelSelected > 5)
+		if(modelSelected > 6)
 			modelSelected = 0;
 		if(modelSelected == 1)
 			fileName = "../animaciones/animation_dart_joints.txt";
@@ -1389,6 +1446,10 @@ bool processInput(bool continueApplication) {
 			camera = std::shared_ptr<Camera>(new FirstPersonCamera(glm::vec3(0.0, 3.0, 4.0)));
 			camera->setSensitivity(5.0f); // Mayor sensibilidad para giro con mouse
 			std::cout << "Free camera mode active" << std::endl;
+		} else if (modelSelected == 6) {
+			camera = std::shared_ptr<Camera>(new AerialCamera(glm::vec3(0.0, 30.0, 0.0)));
+			camera->setSensitivity(1.0f);
+			std::cout << "Aerial camera mode active" << std::endl;
 		} else {
 			camera = std::shared_ptr<Camera>(new ThirdPersonCamera());
 			camera->setDistanceFromTarget(distanceFromTarget);
@@ -1559,6 +1620,23 @@ bool processInput(bool continueApplication) {
 				fps->setPosition(fps->getPosition() + glm::vec3(0.0f, 0.02f, 0.0f));
 			if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 				fps->setPosition(fps->getPosition() - glm::vec3(0.0f, 0.02f, 0.0f));
+		}
+	}
+	if (modelSelected == 6) {
+		AerialCamera *air = dynamic_cast<AerialCamera*>(camera.get());
+		if (air) {
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+				air->moveFrontCamera(true, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+				air->moveFrontCamera(false, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+				air->moveRightCamera(true, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+				air->moveRightCamera(false, deltaTime);
+			if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+				air->setPosition(air->getPosition() + glm::vec3(0.0f, 0.25f, 0.0f));
+			if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+				air->setPosition(air->getPosition() - glm::vec3(0.0f, 0.25f, 0.0f));
 		}
 	}
 
@@ -1747,6 +1825,8 @@ void renderSolidScene(){
 	// Laberinto models at origin
 	modelEntrada.render(modelMatrixEntrada);
 	modelSalida.render(modelMatrixSalida);
+	modelPuertaDer.render(modelMatrixPuertaDer);
+	modelPuertaIzq.render(modelMatrixPuertaIzq);
 	modelMuroDer.render(modelMatrixMuroDer);
 	modelMuroIzq.render(modelMatrixMuroIzq);
 
@@ -1928,6 +2008,23 @@ void renderSolidScene(){
 		modelMatrixAntochaTemp = glm::scale(modelMatrixAntochaTemp, glm::vec3(1.0f, 1.0f, 1.0f));
 		modelAntocha.render(modelMatrixAntochaTemp);
 	}
+
+		// Laberinto walls additional
+		modelMuro1.render(glm::scale(modelMatrixMuro1, glm::vec3(0.5f)));
+		modelMuro2.render(glm::scale(modelMatrixMuro2, glm::vec3(0.5f)));
+		modelMuro3.render(glm::scale(modelMatrixMuro3, glm::vec3(0.5f)));
+		modelMuro4.render(glm::scale(modelMatrixMuro4, glm::vec3(0.5f)));
+		modelMuro5.render(glm::scale(modelMatrixMuro5, glm::vec3(0.5f)));
+		modelMuro6.render(glm::scale(modelMatrixMuro6, glm::vec3(0.5f)));
+		modelMuro7.render(glm::scale(modelMatrixMuro7, glm::vec3(0.5f)));
+		modelMuro8.render(glm::scale(modelMatrixMuro8, glm::vec3(0.5f)));
+		modelMuro9.render(glm::scale(modelMatrixMuro9, glm::vec3(0.5f)));
+		modelMuro10.render(glm::scale(modelMatrixMuro10, glm::vec3(0.5f)));
+		modelMuro11.render(glm::scale(modelMatrixMuro11, glm::vec3(0.5f)));
+		modelMuro12.render(glm::scale(modelMatrixMuro12, glm::vec3(0.5f)));
+		modelMuro13.render(glm::scale(modelMatrixMuro13, glm::vec3(0.5f)));
+		modelMuro14.render(glm::scale(modelMatrixMuro14, glm::vec3(0.5f)));
+		modelMuro15.render(glm::scale(modelMatrixMuro15, glm::vec3(0.5f)));
 
 	/*******************************************
 	 * Skybox
@@ -2149,6 +2246,52 @@ void applicationLoop() {
 
 	modelMatrixFountain = glm::translate(modelMatrixFountain, glm::vec3(5.0, 0.0, -40.0));
 
+	// Muros del laberinto
+	modelMatrixMuro1 = glm::mat4(1.0f);
+	modelMatrixMuro1 = glm::translate(modelMatrixMuro1, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro2 = glm::mat4(1.0f);
+	modelMatrixMuro2 = glm::translate(modelMatrixMuro2, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro3 = glm::mat4(1.0f);
+	modelMatrixMuro3 = glm::translate(modelMatrixMuro3, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro4 = glm::mat4(1.0f);
+	modelMatrixMuro4 = glm::translate(modelMatrixMuro4, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro5 = glm::mat4(1.0f);
+	modelMatrixMuro5 = glm::translate(modelMatrixMuro5, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro6 = glm::mat4(1.0f);
+	modelMatrixMuro6 = glm::translate(modelMatrixMuro6, glm::vec3(0.0f, 0.0f, 0.0f)); //-50 en z
+
+	modelMatrixMuro7 = glm::mat4(1.0f);
+	modelMatrixMuro7 = glm::translate(modelMatrixMuro7, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro8 = glm::mat4(1.0f);
+	modelMatrixMuro8 = glm::translate(modelMatrixMuro8, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro9 = glm::mat4(1.0f);
+	modelMatrixMuro9 = glm::translate(modelMatrixMuro9, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro10 = glm::mat4(1.0f);
+	modelMatrixMuro10 = glm::translate(modelMatrixMuro10, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro11 = glm::mat4(1.0f);
+	modelMatrixMuro11 = glm::translate(modelMatrixMuro11, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro12 = glm::mat4(1.0f);
+	modelMatrixMuro12 = glm::translate(modelMatrixMuro12, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro13 = glm::mat4(1.0f);
+	modelMatrixMuro13 = glm::translate(modelMatrixMuro13, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro14 = glm::mat4(1.0f);
+	modelMatrixMuro14 = glm::translate(modelMatrixMuro14, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	modelMatrixMuro15 = glm::mat4(1.0f);
+	modelMatrixMuro15 = glm::translate(modelMatrixMuro15, glm::vec3(0.0f, 0.0f, 0.0f));
+	//Limites del laberinto
 	modelMatrixEntrada = glm::translate(modelMatrixEntrada, glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixEntrada = glm::rotate(modelMatrixEntrada, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixEntrada = glm::scale(modelMatrixEntrada, glm::vec3(0.5f));
@@ -2156,6 +2299,15 @@ void applicationLoop() {
 	modelMatrixSalida = glm::translate(modelMatrixSalida, glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixSalida = glm::rotate(modelMatrixSalida, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixSalida = glm::scale(modelMatrixSalida, glm::vec3(0.5f));
+
+	// Puertas del laberinto
+	modelMatrixPuertaDer = glm::translate(modelMatrixPuertaDer, glm::vec3(0.0f, 0.0f, 0.0f));
+	modelMatrixPuertaDer = glm::rotate(modelMatrixPuertaDer, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixPuertaDer = glm::scale(modelMatrixPuertaDer, glm::vec3(0.5f));
+
+	modelMatrixPuertaIzq = glm::translate(modelMatrixPuertaIzq, glm::vec3(0.0f, 0.0f, 0.0f));
+	modelMatrixPuertaIzq = glm::rotate(modelMatrixPuertaIzq, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrixPuertaIzq = glm::scale(modelMatrixPuertaIzq, glm::vec3(0.5f));
 
 	modelMatrixMuroDer = glm::translate(modelMatrixMuroDer, glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixMuroDer = glm::rotate(modelMatrixMuroDer, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
