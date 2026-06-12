@@ -151,7 +151,9 @@ GLuint textureHeartID;
 GLuint textureParticleFountainID;
 GLuint textureParticleFireID;
 
-bool iniciaPartida = false, presionarOpcion = false;
+bool iniciaPartida = false;
+bool presionarOpcion = false;
+bool presionarSeleccionMenu = false;
 
 // Modelo para el render del texto
 FontTypeRendering::FontTypeRendering *modelText;
@@ -256,6 +258,10 @@ std::vector<glm::vec3> antochaPositions = {
 int animationPlayerIndex = 0; // 0 = Idle by default for Player
 int modelSelected = 0;
 bool enableCountSelected = true;
+const float GAMEPAD_DEAD_ZONE = 0.20f;
+const float GAMEPAD_PLAYER_SPEED = 12.0f;
+const float GAMEPAD_PLAYER_TURN_SPEED = 120.0f;
+const float GAMEPAD_CAMERA_SPEED = 3.0f;
 
 // Blending model unsorted
 std::map<std::string, glm::vec3> blendingUnsorted = {
@@ -1414,64 +1420,109 @@ bool processInput(bool continueApplication) {
 		return false;
 	}
 
+	GLFWgamepadstate gamepadState;
+	const bool gamepadConnected =
+		glfwJoystickIsGamepad(GLFW_JOYSTICK_1) == GLFW_TRUE
+		&& glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState)
+			== GLFW_TRUE;
+
 	if(!iniciaPartida){
-		bool presionarEnter = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
-		if(textureActivaID == textureInit1ID && presionarEnter){
-			iniciaPartida = true;
-			textureActivaID = textureScreenID;
+		const bool seleccionarOpcion =
+			glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS
+			|| (gamepadConnected
+				&& gamepadState.buttons[GLFW_GAMEPAD_BUTTON_START]
+					== GLFW_PRESS);
+		const bool cambiarOpcion =
+			glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS
+			|| (gamepadConnected
+				&& gamepadState.buttons[GLFW_GAMEPAD_BUTTON_BACK]
+					== GLFW_PRESS);
+
+		if (!presionarSeleccionMenu && seleccionarOpcion) {
+			presionarSeleccionMenu = true;
+			if (textureActivaID == textureInit1ID) {
+				iniciaPartida = true;
+				textureActivaID = textureScreenID;
+			}
+			else if (textureActivaID == textureInit2ID) {
+				exitApp = true;
+				return false;
+			}
 		}
-		else if(!presionarOpcion && glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS){
+		else if (!seleccionarOpcion) {
+			presionarSeleccionMenu = false;
+		}
+
+		if (!presionarOpcion && cambiarOpcion) {
 			presionarOpcion = true;
 			if(textureActivaID == textureInit1ID)
 				textureActivaID = textureInit2ID;
 			else if(textureActivaID == textureInit2ID)
 				textureActivaID = textureInit1ID;
 		}
-		else if(glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_RELEASE)
+		else if (!cambiarOpcion) {
 			presionarOpcion = false;
+		}
 	}
 
-	if (glfwJoystickPresent(GLFW_JOYSTICK_1) == GL_TRUE) {
-		std::cout << "Esta presente el joystick" << std::endl;
-		int axesCount, buttonCount;
-		const float * axes = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axesCount);
-		std::cout << "Número de ejes disponibles :=>" << axesCount << std::endl;
-		std::cout << "Left Stick X axis: " << axes[0] << std::endl;
-		std::cout << "Left Stick Y axis: " << axes[1] << std::endl;
-		std::cout << "Left Trigger/L2: " << axes[2] << std::endl;
-		std::cout << "Right Stick X axis: " << axes[3] << std::endl;
-		std::cout << "Right Stick Y axis: " << axes[4] << std::endl;
-		std::cout << "Right Trigger/R2: " << axes[5] << std::endl;
+	if (iniciaPartida && gamepadConnected) {
+			const float leftX =
+				gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_X];
+			const float leftY =
+				gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+			const float rightX =
+				gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+			const float rightY =
+				gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
 
-		if(fabs(axes[1]) > 0.2){
-			modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0, 0, -axes[1] * 0.1));
-			if(axes[1] > 0.0f)
-				animationPlayerIndex = 1; // run
-			else
-				animationPlayerIndex = 2; // run backward
-		}
-		if(fabs(axes[0]) > 0.2){
-			modelMatrixPlayer = glm::rotate(modelMatrixPlayer, glm::radians(-axes[0] * 0.5f), glm::vec3(0, 1, 0));
-			// keep idle on rotation
-			animationPlayerIndex = 0; // idle
-		}
+			if (modelSelected == 0) {
+				const bool moving =
+					fabs(leftY) > GAMEPAD_DEAD_ZONE;
+				const bool turning =
+					fabs(leftX) > GAMEPAD_DEAD_ZONE;
 
-		if(fabs(axes[3]) > 0.2){
-			camera->mouseMoveCamera(axes[3], 0.0, deltaTime);
-		}if(fabs(axes[4]) > 0.2){
-			camera->mouseMoveCamera(0.0, axes[4], deltaTime);
-		}
+				if (moving) {
+					const float displacement =
+						-leftY * GAMEPAD_PLAYER_SPEED
+						* static_cast<float>(deltaTime);
+					modelMatrixPlayer = glm::translate(
+						modelMatrixPlayer,
+						glm::vec3(0.0f, 0.0f, displacement));
+					animationPlayerIndex =
+						displacement > 0.0f ? 1 : 2;
+				}
 
-		const unsigned char * buttons = glfwGetJoystickButtons(GLFW_JOYSTICK_1, &buttonCount);
-		std::cout << "Número de botones disponibles :=>" << buttonCount << std::endl;
-		if(buttons[0] == GLFW_PRESS)
-			std::cout << "Se presiona x" << std::endl;
+				if (turning) {
+					const float rotation = glm::radians(
+						-leftX * GAMEPAD_PLAYER_TURN_SPEED
+						* static_cast<float>(deltaTime));
+					modelMatrixPlayer = glm::rotate(
+						modelMatrixPlayer, rotation,
+						glm::vec3(0.0f, 1.0f, 0.0f));
+					if (!moving)
+						animationPlayerIndex = 0;
+				}
+			}
 
-		if(!isJump && buttons[0] == GLFW_PRESS){
-			isJump = true;
-			startTimeJump = currTime;
-			tmv = 0;
-		}
+			// Solo el stick derecho controla la camara. Los gatillos
+			// GLFW_GAMEPAD_AXIS_LEFT_TRIGGER y RIGHT_TRIGGER se ignoran.
+			const float cameraX =
+				fabs(rightX) > GAMEPAD_DEAD_ZONE
+					? rightX * GAMEPAD_CAMERA_SPEED : 0.0f;
+			const float cameraY =
+				fabs(rightY) > GAMEPAD_DEAD_ZONE
+					? rightY * GAMEPAD_CAMERA_SPEED : 0.0f;
+			if (cameraX != 0.0f || cameraY != 0.0f)
+				camera->mouseMoveCamera(
+					cameraX, cameraY, deltaTime);
+
+			if (!isJump
+					&& gamepadState.buttons[GLFW_GAMEPAD_BUTTON_A]
+						== GLFW_PRESS) {
+				isJump = true;
+				startTimeJump = currTime;
+				tmv = 0;
+			}
 	}
 
 	if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
