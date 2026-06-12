@@ -178,7 +178,7 @@ Model guardianModelAnimate;
 Model cyborgModelAnimate;
 // Fountain
 Model modelFountain;
-// Antocha
+// Antorcha
 Model modelAntocha;
 // Terrain model instance
 Terrain terrain(-1, -1, 200, 8, "../Textures/heightmap.png");
@@ -263,6 +263,31 @@ glm::mat4 modelMatrixEnemy2 = glm::mat4(1.0f);
 glm::mat4 modelMatrixEnemy3 = glm::mat4(1.0f);
 glm::mat4 modelMatrixEnemy4 = glm::mat4(1.0f);
 glm::mat4 modelMatrixEnemy5 = glm::mat4(1.0f);
+glm::mat4 baseMatrixEnemy1 = glm::mat4(1.0f);
+glm::mat4 baseMatrixEnemy2 = glm::mat4(1.0f);
+glm::mat4 baseMatrixEnemy3 = glm::mat4(1.0f);
+glm::mat4 baseMatrixEnemy4 = glm::mat4(1.0f);
+glm::mat4 baseMatrixEnemy5 = glm::mat4(1.0f);
+
+struct EnemyPatrolState {
+	float maxDistance;
+	float traveledDistance;
+	float turnAngle;
+	bool turning;
+	int leg;
+};
+
+EnemyPatrolState enemyPatrol1 = { 30.0f, 0.0f, 0.0f, false, 0 };
+EnemyPatrolState enemyPatrol2 = { 37.5f, 0.0f, 0.0f, false, 0 };
+EnemyPatrolState enemyPatrol3 = { 21.0f, 0.0f, 0.0f, false, 0 };
+EnemyPatrolState enemyPatrol4 = { 35.0f, 0.0f, 0.0f, false, 0 };
+EnemyPatrolState enemyPatrol5 = { 55.0f, 0.0f, 0.0f, false, 0 };
+
+const int ENEMY_ANIMATION_TURN = 19;
+const int ENEMY_ANIMATION_WALK = 24;
+const float ENEMY_PATROL_SPEED = 2.25f;
+const float ENEMY_TURN_SPEED = 180.0f;
+
 std::vector<bool> monedasActivas = { true, true, true, true, true };
 int contadorMonedas = 0;
 int vidasJugador = 3;
@@ -274,11 +299,11 @@ AbstractModel::AABB triggerPuertaIzq;
 AbstractModel::AABB triggerPuertaDer;
 // Antocha positions
 std::vector<glm::vec3> antochaPositions = {
-	glm::vec3(0.0f, 1.0f, 0.0f),
-	glm::vec3(0.0f, 1.0f, 0.0f),
-	glm::vec3(1.0f, 1.0f, 0.0f),
-	glm::vec3(0.0f, 1.0f, 0.0f),
-	glm::vec3(0.0f, 1.0f, 0.0f)
+	glm::vec3(40.5f, 0.0f, -45.0f),
+	glm::vec3(60.5f, 0.0f, 20.0f),
+	glm::vec3(-19.5f, 0.0f, -35.0f),
+	glm::vec3(-44.5f, 0.0f, 65.0f),
+	glm::vec3(-74.0f, 0.0f, -24.0f)
 };
 
 int animationPlayerIndex = 0; // 0 = Idle by default for Player
@@ -352,7 +377,11 @@ std::map<std::string, glm::vec3> blendingUnsorted = {
 		{"lambo", glm::vec3(23.0, 0.0, 0.0)},
 		{"heli", glm::vec3(5.0, 10.0, -5.0)},
 		{"fountain", glm::vec3(0.0)},
-		{"fire0",    antochaPositions[0]}   // una entrada por antorcha
+		{"fire0", antochaPositions[0]},
+		{"fire1", antochaPositions[1]},
+		{"fire2", antochaPositions[2]},
+		{"fire3", antochaPositions[3]},
+		{"fire4", antochaPositions[4]}
 };
 
 double deltaTime;
@@ -447,6 +476,10 @@ bool testAABBAABB(const AbstractModel::AABB &a,
 		const AbstractModel::AABB &b);
 AbstractModel::OBB createModelOBB(
 		Model &model, const glm::mat4 &modelMatrix, float scale);
+void updateEnemyPatrol(
+		Model &model, glm::mat4 &modelMatrix,
+		const glm::mat4 &baseMatrix,
+		EnemyPatrolState &patrol, float deltaSeconds);
 
 AbstractModel::AABB transformAABB(const AbstractModel::AABB &aabb,
 		const glm::mat4 &transform) {
@@ -517,6 +550,57 @@ AbstractModel::OBB createModelOBB(
 		collider.e = glm::vec3(0.65f, 1.0f, 0.5f);
 	}
 	return collider;
+}
+
+void updateEnemyPatrol(
+		Model &model, glm::mat4 &modelMatrix,
+		const glm::mat4 &baseMatrix,
+		EnemyPatrolState &patrol, float deltaSeconds) {
+	if (!patrol.turning) {
+		model.setAnimationIndex(ENEMY_ANIMATION_WALK);
+		float remainingDistance =
+			patrol.maxDistance - patrol.traveledDistance;
+		float movement =
+			glm::min(ENEMY_PATROL_SPEED * deltaSeconds, remainingDistance);
+		patrol.traveledDistance += movement;
+
+		if (patrol.traveledDistance >= patrol.maxDistance) {
+			patrol.traveledDistance = patrol.maxDistance;
+			patrol.turning = true;
+			patrol.turnAngle = 0.0f;
+		}
+	} else {
+		model.setAnimationIndex(ENEMY_ANIMATION_TURN);
+		float remainingAngle = 180.0f - patrol.turnAngle;
+		float rotation =
+			glm::min(ENEMY_TURN_SPEED * deltaSeconds, remainingAngle);
+		patrol.turnAngle += rotation;
+
+		if (patrol.turnAngle >= 180.0f) {
+			patrol.turning = false;
+			patrol.turnAngle = 0.0f;
+			patrol.traveledDistance = 0.0f;
+			patrol.leg = (patrol.leg + 1) % 2;
+		}
+	}
+
+	float distance = patrol.traveledDistance;
+	if (patrol.turning)
+		distance = patrol.maxDistance;
+
+	glm::vec3 offset(0.0f);
+	if (patrol.leg == 0)
+		offset.z = -distance;
+	else
+		offset.z = -patrol.maxDistance + distance;
+
+	float orientation =
+		patrol.leg * 180.0f
+		+ (patrol.turning ? patrol.turnAngle : 0.0f);
+	modelMatrix = glm::translate(baseMatrix, offset);
+	modelMatrix = glm::rotate(
+		modelMatrix, glm::radians(orientation),
+		glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
 void initParticleBuffers(){
@@ -904,8 +988,8 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelFountain.loadModel("../models/fountain/fountain.obj");
 	modelFountain.setShader(&shaderMulLighting);
 
-	// Antocha
-	modelAntocha.loadModel("../models/Antocha/Antocha.obj");
+	// Antorcha
+	modelAntocha.loadModel("../models/Antocha/AntochaZero.obj");
 	modelAntocha.setShader(&shaderMulLighting);
 
 	// Terreno
@@ -1485,6 +1569,7 @@ void destroy() {
 	modelEnemy3.destroy();
 	modelEnemy4.destroy();
 	modelEnemy5.destroy();
+	modelAntocha.destroy();
 	playerModelAnimate.destroy();
 	cowboyModelAnimate.destroy();
 	guardianModelAnimate.destroy();
@@ -1953,6 +2038,8 @@ void prepareScene(){
 	modelEnemy3.setShader(&shaderMulLighting);
 	modelEnemy4.setShader(&shaderMulLighting);
 	modelEnemy5.setShader(&shaderMulLighting);
+
+	modelAntocha.setShader(&shaderMulLighting);
 }
 
 void prepareDepthScene(){
@@ -2035,6 +2122,8 @@ void prepareDepthScene(){
 	modelEnemy3.setShader(&shaderDepth);
 	modelEnemy4.setShader(&shaderDepth);
 	modelEnemy5.setShader(&shaderDepth);
+
+	modelAntocha.setShader(&shaderDepth);
 }
 
 void renderSolidScene(){
@@ -2238,11 +2327,6 @@ void renderSolidScene(){
 	modelMatrixEnemy5[3][1] = terrain.getHeightTerrain(
 		modelMatrixEnemy5[3][0], modelMatrixEnemy5[3][2]);
 
-	modelEnemy1.setAnimationIndex(0);
-	modelEnemy2.setAnimationIndex(0);
-	modelEnemy3.setAnimationIndex(0);
-	modelEnemy4.setAnimationIndex(0);
-	modelEnemy5.setAnimationIndex(0);
 	modelEnemy1.render(glm::scale(modelMatrixEnemy1, glm::vec3(0.01f)));
 	modelEnemy2.render(glm::scale(modelMatrixEnemy2, glm::vec3(0.01f)));
 	modelEnemy3.render(glm::scale(modelMatrixEnemy3, glm::vec3(0.01f)));
@@ -2273,11 +2357,10 @@ void renderSolidScene(){
 	glEnable(GL_CULL_FACE);
 
 	// Antochas
-	for(int i = 0; i < antochaPositions.size(); i++){
-		glm::mat4 modelMatrixAntochaTemp = glm::mat4(1.0f);
-		modelMatrixAntochaTemp = glm::translate(modelMatrixAntochaTemp, antochaPositions[i]);
-		modelMatrixAntochaTemp = glm::scale(modelMatrixAntochaTemp, glm::vec3(1.0f, 1.0f, 1.0f));
-		modelAntocha.render(modelMatrixAntochaTemp);
+	for (int i = 0; i < antochaPositions.size(); i++) {
+		glm::mat4 modelMatrixAntocha = glm::translate(
+			glm::mat4(1.0f), antochaPositions[i]);
+		modelAntocha.render(modelMatrixAntocha);
 	}
 
 		// Laberinto walls additional
@@ -2417,15 +2500,16 @@ void renderAlphaScene(bool render = true){
 			glDepthMask(GL_TRUE);
 			shaderParticlesFountain.turnOff();
 		}
-		else if (render && it->second.first.compare("fire0") == 0) {
-			glm::mat4 modelMatrixFire = glm::mat4(1.0f);
-			modelMatrixFire = glm::translate(modelMatrixFire, it->second.second);
-
-			// Ajusta esta altura según el modelo de tu antorcha
-			modelMatrixFire[3][1] = terrain.getHeightTerrain(
-				modelMatrixFire[3][0],
-				modelMatrixFire[3][2]
-			) + 2.0f;
+		else if (render
+				&& it->second.first.compare(0, 4, "fire") == 0) {
+			const AbstractModel::AABB &torchAABB = modelAntocha.getAAbb();
+			glm::vec3 firePosition(
+				(torchAABB.mins.x + torchAABB.maxs.x) * 0.5f + 0.5f,
+				torchAABB.maxs.y,
+				(torchAABB.mins.z + torchAABB.maxs.z) * 0.5f);
+			firePosition += it->second.second;
+			glm::mat4 modelMatrixFire = glm::translate(
+				glm::mat4(1.0f), firePosition);
 
 			currentTimeFire = TimeManager::Instance().GetTime();
 
@@ -2545,6 +2629,11 @@ void applicationLoop() {
 	modelMatrixEnemy5 = glm::rotate(
 		modelMatrixEnemy5, glm::radians(-90.0f),
 		glm::vec3(0.0f, 1.0f, 0.0f));
+	baseMatrixEnemy1 = modelMatrixEnemy1;
+	baseMatrixEnemy2 = modelMatrixEnemy2;
+	baseMatrixEnemy3 = modelMatrixEnemy3;
+	baseMatrixEnemy4 = modelMatrixEnemy4;
+	baseMatrixEnemy5 = modelMatrixEnemy5;
 
 	modelMatrixCowboy = glm::translate(modelMatrixCowboy, glm::vec3(13.0, 0.05, 0.0));
 
@@ -2669,6 +2758,29 @@ void applicationLoop() {
 		TimeManager::Instance().CalculateFrameRate(true);
 		deltaTime = TimeManager::Instance().DeltaTime;
 		psi = processInput(true);
+
+		float patrolDeltaTime = glm::min(
+			static_cast<float>(deltaTime), 0.1f);
+		updateEnemyPatrol(
+			modelEnemy1, modelMatrixEnemy1,
+			baseMatrixEnemy1,
+			enemyPatrol1, patrolDeltaTime);
+		updateEnemyPatrol(
+			modelEnemy2, modelMatrixEnemy2,
+			baseMatrixEnemy2,
+			enemyPatrol2, patrolDeltaTime);
+		updateEnemyPatrol(
+			modelEnemy3, modelMatrixEnemy3,
+			baseMatrixEnemy3,
+			enemyPatrol3, patrolDeltaTime);
+		updateEnemyPatrol(
+			modelEnemy4, modelMatrixEnemy4,
+			baseMatrixEnemy4,
+			enemyPatrol4, patrolDeltaTime);
+		updateEnemyPatrol(
+			modelEnemy5, modelMatrixEnemy5,
+			baseMatrixEnemy5,
+			enemyPatrol5, patrolDeltaTime);
 
 		if (!puertasAbiertas
 				&& contadorMonedas == static_cast<int>(monedasActivas.size())) {
