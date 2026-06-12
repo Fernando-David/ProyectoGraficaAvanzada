@@ -251,6 +251,10 @@ glm::mat4 modelMatrixMoneda4 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda5 = glm::mat4(1.0f);
 std::vector<bool> monedasActivas = { true, true, true, true, true };
 int contadorMonedas = 0;
+bool puertasAbiertas = false;
+bool juegoGanado = false;
+AbstractModel::AABB triggerPuertaIzq;
+AbstractModel::AABB triggerPuertaDer;
 // Antocha positions
 std::vector<glm::vec3> antochaPositions = {
 	glm::vec3(0.0f, 1.0f, 0.0f),
@@ -348,6 +352,7 @@ double startTimeJump = 0;
 std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4> > collidersOBB;
 std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4> > collidersSBB;
 std::map<std::string, AbstractModel::AABB> collidersMonedasAABB;
+std::map<std::string, AbstractModel::AABB> collidersMurosAABB;
 
 // Variables animacion maquina de estados eclipse
 const float avance = 0.1;
@@ -1651,11 +1656,11 @@ bool processInput(bool continueApplication) {
 		animationPlayerIndex = 0;
 	}
 	if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS){
-		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, 0.1));
+		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, 0.5));
 		animationPlayerIndex = 1; // run when moving forward
 	}
 	else if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS){
-		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, -0.1));
+		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, -0.5));
 		animationPlayerIndex = 2; // run backward
 	}
 
@@ -2411,6 +2416,17 @@ void applicationLoop() {
 	modelMatrixPuertaIzq = glm::rotate(modelMatrixPuertaIzq, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixPuertaIzq = glm::scale(modelMatrixPuertaIzq, glm::vec3(0.5f));
 
+	// Se conserva el area original de las puertas como zona de victoria.
+	triggerPuertaDer = transformAABB(
+		modelPuertaDer.getAAbb(), modelMatrixPuertaDer);
+	triggerPuertaIzq = transformAABB(
+		modelPuertaIzq.getAAbb(), modelMatrixPuertaIzq);
+	const glm::vec3 margenTriggerPuerta(1.5f, 0.5f, 3.0f);
+	triggerPuertaDer.mins -= margenTriggerPuerta;
+	triggerPuertaDer.maxs += margenTriggerPuerta;
+	triggerPuertaIzq.mins -= margenTriggerPuerta;
+	triggerPuertaIzq.maxs += margenTriggerPuerta;
+
 	modelMatrixMuroDer = glm::translate(modelMatrixMuroDer, glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixMuroDer = glm::rotate(modelMatrixMuroDer, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixMuroDer = glm::scale(modelMatrixMuroDer, glm::vec3(0.5f));
@@ -2444,6 +2460,41 @@ void applicationLoop() {
 		TimeManager::Instance().CalculateFrameRate(true);
 		deltaTime = TimeManager::Instance().DeltaTime;
 		psi = processInput(true);
+
+		if (!puertasAbiertas
+				&& contadorMonedas == static_cast<int>(monedasActivas.size())) {
+			const AbstractModel::AABB &aabbPuertaIzq =
+				modelPuertaIzq.getAAbb();
+			glm::vec3 pivotePuertaIzq(
+				aabbPuertaIzq.maxs.x,
+				(aabbPuertaIzq.mins.y + aabbPuertaIzq.maxs.y) * 0.5f,
+				(aabbPuertaIzq.mins.z + aabbPuertaIzq.maxs.z) * 0.5f);
+			modelMatrixPuertaIzq = glm::translate(
+				modelMatrixPuertaIzq, pivotePuertaIzq);
+			modelMatrixPuertaIzq = glm::rotate(
+				modelMatrixPuertaIzq, glm::radians(-90.0f),
+				glm::vec3(0.0f, 1.0f, 0.0f));
+			modelMatrixPuertaIzq = glm::translate(
+				modelMatrixPuertaIzq, -pivotePuertaIzq);
+
+			const AbstractModel::AABB &aabbPuertaDer =
+				modelPuertaDer.getAAbb();
+			glm::vec3 pivotePuertaDer(
+				aabbPuertaDer.mins.x,
+				(aabbPuertaDer.mins.y + aabbPuertaDer.maxs.y) * 0.5f,
+				(aabbPuertaDer.mins.z + aabbPuertaDer.maxs.z) * 0.5f);
+			modelMatrixPuertaDer = glm::translate(
+				modelMatrixPuertaDer, pivotePuertaDer);
+			modelMatrixPuertaDer = glm::rotate(
+				modelMatrixPuertaDer, glm::radians(90.0f),
+				glm::vec3(0.0f, 1.0f, 0.0f));
+			modelMatrixPuertaDer = glm::translate(
+				modelMatrixPuertaDer, -pivotePuertaDer);
+
+			puertasAbiertas = true;
+			std::cout << "Todas las monedas recolectadas. Puertas abiertas."
+					<< std::endl;
+		}
 
 		std::map<std::string, bool> collisionDetection;
 
@@ -2807,6 +2858,69 @@ void applicationLoop() {
 				modelMoneda5.getAAbb(),
 				glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
 
+		// Colliders AABB de los muros. Las etiquetas "Muro-" identifican
+		// elementos solidos que deben bloquear el movimiento del jugador.
+		collidersMurosAABB.clear();
+		collidersMurosAABB["Muro-Der"] = transformAABB(
+			modelMuroDer.getAAbb(), modelMatrixMuroDer);
+		collidersMurosAABB["Muro-Izq"] = transformAABB(
+			modelMuroIzq.getAAbb(), modelMatrixMuroIzq);
+		collidersMurosAABB["Entrada"] = transformAABB(
+			modelEntrada.getAAbb(), modelMatrixEntrada);
+		collidersMurosAABB["Salida"] = transformAABB(
+			modelSalida.getAAbb(), modelMatrixSalida);
+		if (!puertasAbiertas) {
+			collidersMurosAABB["Puerta-Izq"] = transformAABB(
+				modelPuertaIzq.getAAbb(), modelMatrixPuertaIzq);
+			collidersMurosAABB["Puerta-Der"] = transformAABB(
+				modelPuertaDer.getAAbb(), modelMatrixPuertaDer);
+		}
+		collidersMurosAABB["Muro-1"] = transformAABB(
+			modelMuro1.getAAbb(),
+			glm::scale(modelMatrixMuro1, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-2"] = transformAABB(
+			modelMuro2.getAAbb(),
+			glm::scale(modelMatrixMuro2, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-3"] = transformAABB(
+			modelMuro3.getAAbb(),
+			glm::scale(modelMatrixMuro3, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-4"] = transformAABB(
+			modelMuro4.getAAbb(),
+			glm::scale(modelMatrixMuro4, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-5"] = transformAABB(
+			modelMuro5.getAAbb(),
+			glm::scale(modelMatrixMuro5, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-6"] = transformAABB(
+			modelMuro6.getAAbb(),
+			glm::scale(modelMatrixMuro6, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-7"] = transformAABB(
+			modelMuro7.getAAbb(),
+			glm::scale(modelMatrixMuro7, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-8"] = transformAABB(
+			modelMuro8.getAAbb(),
+			glm::scale(modelMatrixMuro8, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-9"] = transformAABB(
+			modelMuro9.getAAbb(),
+			glm::scale(modelMatrixMuro9, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-10"] = transformAABB(
+			modelMuro10.getAAbb(),
+			glm::scale(modelMatrixMuro10, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-11"] = transformAABB(
+			modelMuro11.getAAbb(),
+			glm::scale(modelMatrixMuro11, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-12"] = transformAABB(
+			modelMuro12.getAAbb(),
+			glm::scale(modelMatrixMuro12, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-13"] = transformAABB(
+			modelMuro13.getAAbb(),
+			glm::scale(modelMatrixMuro13, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-14"] = transformAABB(
+			modelMuro14.getAAbb(),
+			glm::scale(modelMatrixMuro14, glm::vec3(0.5f)));
+		collidersMurosAABB["Muro-15"] = transformAABB(
+			modelMuro15.getAAbb(),
+			glm::scale(modelMatrixMuro15, glm::vec3(0.5f)));
+
 		/*******************************************
 		 * Render de colliders
 		 *******************************************/
@@ -2843,6 +2957,37 @@ void applicationLoop() {
 			boxCollider.render(matrixCollider);
 		}
 
+		for (std::map<std::string, AbstractModel::AABB>::iterator it =
+				collidersMurosAABB.begin();
+				it != collidersMurosAABB.end(); it++) {
+			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
+			glm::vec3 size = it->second.maxs - it->second.mins;
+			glm::mat4 matrixCollider = glm::translate(glm::mat4(1.0f), center);
+			matrixCollider = glm::scale(matrixCollider, size);
+			boxCollider.setColor(glm::vec4(1.0, 0.0, 0.0, 1.0));
+			boxCollider.enableWireMode();
+			boxCollider.render(matrixCollider);
+		}
+
+		if (puertasAbiertas) {
+			AbstractModel::AABB triggersPuertas[2] = {
+				triggerPuertaIzq, triggerPuertaDer
+			};
+			for (int i = 0; i < 2; i++) {
+				glm::vec3 center =
+					(triggersPuertas[i].mins + triggersPuertas[i].maxs)
+					* 0.5f;
+				glm::vec3 size =
+					triggersPuertas[i].maxs - triggersPuertas[i].mins;
+				glm::mat4 matrixCollider =
+					glm::translate(glm::mat4(1.0f), center);
+				matrixCollider = glm::scale(matrixCollider, size);
+				boxCollider.setColor(glm::vec4(0.0, 1.0, 0.0, 1.0));
+				boxCollider.enableWireMode();
+				boxCollider.render(matrixCollider);
+			}
+		}
+
 		/**********Render de transparencias***************/
 		renderAlphaScene();
 
@@ -2861,6 +3006,25 @@ void applicationLoop() {
 					std::cout << it->first << " recolectada. Monedas: "
 							<< contadorMonedas << std::endl;
 				}
+			}
+		}
+
+		if (puertasAbiertas && !juegoGanado
+				&& (testAABBAABB(playerAABB, triggerPuertaIzq)
+					|| testAABBAABB(playerAABB, triggerPuertaDer))) {
+			juegoGanado = true;
+			std::cout << "Ganaste" << std::endl;
+		}
+
+		for (std::map<std::string, AbstractModel::AABB>::iterator it =
+				collidersMurosAABB.begin();
+				it != collidersMurosAABB.end(); it++) {
+			if (testAABBAABB(playerAABB, it->second)) {
+				std::cout << "Colision del jugador con " << it->first
+						<< std::endl;
+				addOrUpdateCollisionDetection(
+					collisionDetection, "player", true);
+				break;
 			}
 		}
 
