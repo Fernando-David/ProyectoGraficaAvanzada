@@ -6,6 +6,7 @@
 //std includes
 #include <string>
 #include <iostream>
+#include <limits>
 
 //glfw include
 #include <GLFW/glfw3.h>
@@ -153,6 +154,12 @@ Model modelMuro12;
 Model modelMuro13;
 Model modelMuro14;
 Model modelMuro15;
+// Monedas del laberinto
+Model modelMoneda1;
+Model modelMoneda2;
+Model modelMoneda3;
+Model modelMoneda4;
+Model modelMoneda5;
 // Modelos animados
 // Player (replaces Mayow)
 Model playerModelAnimate;
@@ -237,6 +244,13 @@ glm::mat4 modelMatrixMuro12 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuro13 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuro14 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuro15 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMoneda1 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMoneda2 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMoneda3 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMoneda4 = glm::mat4(1.0f);
+glm::mat4 modelMatrixMoneda5 = glm::mat4(1.0f);
+std::vector<bool> monedasActivas = { true, true, true, true, true };
+int contadorMonedas = 0;
 // Antocha positions
 std::vector<glm::vec3> antochaPositions = {
 	glm::vec3(0.0f, 1.0f, 0.0f),
@@ -333,6 +347,7 @@ double startTimeJump = 0;
 // Colliders
 std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4> > collidersOBB;
 std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4> > collidersSBB;
+std::map<std::string, AbstractModel::AABB> collidersMonedasAABB;
 
 // Variables animacion maquina de estados eclipse
 const float avance = 0.1;
@@ -402,6 +417,48 @@ void initFireParticleBuffers();
 void init(int width, int height, std::string strTitle, bool bFullScreen);
 void destroy();
 bool processInput(bool continueApplication = true);
+AbstractModel::AABB transformAABB(const AbstractModel::AABB &aabb,
+		const glm::mat4 &transform);
+AbstractModel::AABB obbToAABB(const AbstractModel::OBB &obb);
+bool testAABBAABB(const AbstractModel::AABB &a,
+		const AbstractModel::AABB &b);
+
+AbstractModel::AABB transformAABB(const AbstractModel::AABB &aabb,
+		const glm::mat4 &transform) {
+	glm::vec3 transformedMin(std::numeric_limits<float>::max());
+	glm::vec3 transformedMax(std::numeric_limits<float>::lowest());
+
+	for (int x = 0; x < 2; x++) {
+		for (int y = 0; y < 2; y++) {
+			for (int z = 0; z < 2; z++) {
+				glm::vec3 corner(
+					x == 0 ? aabb.mins.x : aabb.maxs.x,
+					y == 0 ? aabb.mins.y : aabb.maxs.y,
+					z == 0 ? aabb.mins.z : aabb.maxs.z);
+				glm::vec3 transformedCorner = glm::vec3(
+					transform * glm::vec4(corner, 1.0f));
+				transformedMin = glm::min(transformedMin, transformedCorner);
+				transformedMax = glm::max(transformedMax, transformedCorner);
+			}
+		}
+	}
+
+	return AbstractModel::AABB(transformedMin, transformedMax);
+}
+
+AbstractModel::AABB obbToAABB(const AbstractModel::OBB &obb) {
+	glm::mat4 transform = glm::translate(glm::mat4(1.0f), obb.c)
+			* glm::mat4(obb.u);
+	AbstractModel::AABB localAABB(-obb.e, obb.e);
+	return transformAABB(localAABB, transform);
+}
+
+bool testAABBAABB(const AbstractModel::AABB &a,
+		const AbstractModel::AABB &b) {
+	return a.mins.x <= b.maxs.x && a.maxs.x >= b.mins.x
+			&& a.mins.y <= b.maxs.y && a.maxs.y >= b.mins.y
+			&& a.mins.z <= b.maxs.z && a.maxs.z >= b.mins.z;
+}
 
 void initParticleBuffers(){
 	//Generar los buffers
@@ -750,6 +807,13 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelMuro13.loadModel("../models/Laberinto/Muro13.obj"); modelMuro13.setShader(&shaderMulLighting);
 	modelMuro14.loadModel("../models/Laberinto/Muro14.obj"); modelMuro14.setShader(&shaderMulLighting);
 	modelMuro15.loadModel("../models/Laberinto/Muro15.obj"); modelMuro15.setShader(&shaderMulLighting);
+
+	// Monedas del laberinto
+	modelMoneda1.loadModel("../models/Laberinto/Moneda1.obj"); modelMoneda1.setShader(&shaderMulLighting);
+	modelMoneda2.loadModel("../models/Laberinto/Moneda2.obj"); modelMoneda2.setShader(&shaderMulLighting);
+	modelMoneda3.loadModel("../models/Laberinto/Moneda3.obj"); modelMoneda3.setShader(&shaderMulLighting);
+	modelMoneda4.loadModel("../models/Laberinto/Moneda4.obj"); modelMoneda4.setShader(&shaderMulLighting);
+	modelMoneda5.loadModel("../models/Laberinto/Moneda5.obj"); modelMoneda5.setShader(&shaderMulLighting);
 
 	// Player
 	playerModelAnimate.loadModel("../models/Player/Player.fbx");
@@ -1266,6 +1330,11 @@ void destroy() {
 	modelLamp1.destroy();
 	modelLamp2.destroy();
 	modelLampPost2.destroy();
+	modelMoneda1.destroy();
+	modelMoneda2.destroy();
+	modelMoneda3.destroy();
+	modelMoneda4.destroy();
+	modelMoneda5.destroy();
 	playerModelAnimate.destroy();
 	cowboyModelAnimate.destroy();
 	guardianModelAnimate.destroy();
@@ -1718,6 +1787,13 @@ void prepareScene(){
 
 	// Fountain
 	modelFountain.setShader(&shaderMulLighting);
+
+	// Monedas del laberinto
+	modelMoneda1.setShader(&shaderMulLighting);
+	modelMoneda2.setShader(&shaderMulLighting);
+	modelMoneda3.setShader(&shaderMulLighting);
+	modelMoneda4.setShader(&shaderMulLighting);
+	modelMoneda5.setShader(&shaderMulLighting);
 }
 
 void prepareDepthScene(){
@@ -1787,6 +1863,13 @@ void prepareDepthScene(){
 
 	// Fountain
 	modelFountain.setShader(&shaderDepth);
+
+	// Monedas del laberinto
+	modelMoneda1.setShader(&shaderDepth);
+	modelMoneda2.setShader(&shaderDepth);
+	modelMoneda3.setShader(&shaderDepth);
+	modelMoneda4.setShader(&shaderDepth);
+	modelMoneda5.setShader(&shaderDepth);
 }
 
 void renderSolidScene(){
@@ -2026,6 +2109,18 @@ void renderSolidScene(){
 		modelMuro14.render(glm::scale(modelMatrixMuro14, glm::vec3(0.5f)));
 		modelMuro15.render(glm::scale(modelMatrixMuro15, glm::vec3(0.5f)));
 
+		// Monedas del laberinto. Sus posiciones ya vienen incorporadas en los OBJ.
+		if (monedasActivas[0])
+			modelMoneda1.render(glm::scale(modelMatrixMoneda1, glm::vec3(0.5f)));
+		if (monedasActivas[1])
+			modelMoneda2.render(glm::scale(modelMatrixMoneda2, glm::vec3(0.5f)));
+		if (monedasActivas[2])
+			modelMoneda3.render(glm::scale(modelMatrixMoneda3, glm::vec3(0.5f)));
+		if (monedasActivas[3])
+			modelMoneda4.render(glm::scale(modelMatrixMoneda4, glm::vec3(0.5f)));
+		if (monedasActivas[4])
+			modelMoneda5.render(glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
+
 	/*******************************************
 	 * Skybox
 	 *******************************************/
@@ -2234,7 +2329,7 @@ void applicationLoop() {
 
 	modelMatrixBuzz = glm::translate(modelMatrixBuzz, glm::vec3(15.0, 0.0, -10.0));
 
-	modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(13.0f, 0.05f, -5.0f));
+	modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0f, 0.05f, -70.0f));
 	modelMatrixPlayer = glm::rotate(modelMatrixPlayer, glm::radians(-90.0f), glm::vec3(0, 1, 0));
 
 	modelMatrixCowboy = glm::translate(modelMatrixCowboy, glm::vec3(13.0, 0.05, 0.0));
@@ -2291,6 +2386,13 @@ void applicationLoop() {
 
 	modelMatrixMuro15 = glm::mat4(1.0f);
 	modelMatrixMuro15 = glm::translate(modelMatrixMuro15, glm::vec3(0.0f, 0.0f, 0.0f));
+
+	// Las monedas ya contienen sus transformaciones dentro de cada archivo OBJ.
+	modelMatrixMoneda1 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+	modelMatrixMoneda2 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+	modelMatrixMoneda3 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+	modelMatrixMoneda4 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+	modelMatrixMoneda5 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
 	//Limites del laberinto
 	modelMatrixEntrada = glm::translate(modelMatrixEntrada, glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixEntrada = glm::rotate(modelMatrixEntrada, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -2681,6 +2783,30 @@ void applicationLoop() {
 
 		addOrUpdateColliders(collidersOBB, "player", playerCollider, modelMatrixPlayer);
 
+		// Colliders AABB de monedas. La etiqueta "Moneda-" permite
+		// distinguir objetos recolectables de los obstaculos del escenario.
+		collidersMonedasAABB.clear();
+		if (monedasActivas[0])
+			collidersMonedasAABB["Moneda-1"] = transformAABB(
+				modelMoneda1.getAAbb(),
+				glm::scale(modelMatrixMoneda1, glm::vec3(0.5f)));
+		if (monedasActivas[1])
+			collidersMonedasAABB["Moneda-2"] = transformAABB(
+				modelMoneda2.getAAbb(),
+				glm::scale(modelMatrixMoneda2, glm::vec3(0.5f)));
+		if (monedasActivas[2])
+			collidersMonedasAABB["Moneda-3"] = transformAABB(
+				modelMoneda3.getAAbb(),
+				glm::scale(modelMatrixMoneda3, glm::vec3(0.5f)));
+		if (monedasActivas[3])
+			collidersMonedasAABB["Moneda-4"] = transformAABB(
+				modelMoneda4.getAAbb(),
+				glm::scale(modelMatrixMoneda4, glm::vec3(0.5f)));
+		if (monedasActivas[4])
+			collidersMonedasAABB["Moneda-5"] = transformAABB(
+				modelMoneda5.getAAbb(),
+				glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
+
 		/*******************************************
 		 * Render de colliders
 		 *******************************************/
@@ -2705,10 +2831,39 @@ void applicationLoop() {
 			sphereCollider.render(matrixCollider);
 		}
 
+		for (std::map<std::string, AbstractModel::AABB>::iterator it =
+				collidersMonedasAABB.begin();
+				it != collidersMonedasAABB.end(); it++) {
+			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
+			glm::vec3 size = it->second.maxs - it->second.mins;
+			glm::mat4 matrixCollider = glm::translate(glm::mat4(1.0f), center);
+			matrixCollider = glm::scale(matrixCollider, size);
+			boxCollider.setColor(glm::vec4(1.0, 0.85, 0.0, 1.0));
+			boxCollider.enableWireMode();
+			boxCollider.render(matrixCollider);
+		}
+
 		/**********Render de transparencias***************/
 		renderAlphaScene();
 
 		/*********************Prueba de colisiones****************************/
+		AbstractModel::AABB playerAABB = obbToAABB(playerCollider);
+		for (std::map<std::string, AbstractModel::AABB>::iterator it =
+				collidersMonedasAABB.begin();
+				it != collidersMonedasAABB.end(); it++) {
+			if (testAABBAABB(playerAABB, it->second)) {
+				int monedaIndex = std::stoi(it->first.substr(7)) - 1;
+				if (monedaIndex >= 0
+						&& monedaIndex < monedasActivas.size()
+						&& monedasActivas[monedaIndex]) {
+					monedasActivas[monedaIndex] = false;
+					contadorMonedas++;
+					std::cout << it->first << " recolectada. Monedas: "
+							<< contadorMonedas << std::endl;
+				}
+			}
+		}
+
 		for (std::map<std::string,
 			std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4>>::iterator it =
 			collidersSBB.begin(); it != collidersSBB.end(); it++) {
