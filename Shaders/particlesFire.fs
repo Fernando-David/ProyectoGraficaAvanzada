@@ -12,7 +12,7 @@ void main()
 
     float alpha = texColor.a;
 
-    // Si la textura no tiene canal alpha útil, usamos intensidad del color
+  
     if (alpha >= 0.99) {
         alpha = max(texColor.r, max(texColor.g, texColor.b));
     }

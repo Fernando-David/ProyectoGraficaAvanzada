@@ -303,11 +303,11 @@ const int ENEMY_AUDIO_BUFFER_INDEX = 10;
 ALfloat listenerPos[] = { 0.0, 0.0, 4.0 };
 ALfloat listenerVel[] = { 0.0, 0.0, 0.0 };
 ALfloat listenerOri[] = { 0.0, 0.0, 1.0, 0.0, 1.0, 0.0 };
-/*
- * Audio de Darth reservado para una futura integracion con OpenAL.
- * ALfloat darthSourcePos[] = { 2.0, 0.0, 0.0 };
- * ALfloat darthSourceVel[] = { 0.0, 0.0, 0.0 };
- */
+
+
+
+
+
 ALuint buffer[NUM_BUFFERS];
 ALuint source[NUM_SOURCES];
 ALuint environment[NUM_ENVIRONMENTS];
@@ -1017,7 +1017,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	else {
 		printf("init() - No errors yet.");
 	}
-	// Generate buffers, or else no sound will happen!
+	
 	alGenBuffers(NUM_BUFFERS, buffer);
 	buffer[0] = alutCreateBufferFromFile("../sounds/FuegoMono.wav");
 	buffer[1] = alutCreateBufferFromFile("../sounds/BrillanteMono.wav");
@@ -1036,8 +1036,8 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		alutCreateBufferFromFile("../sounds/4_1_StoryChaboon.wav");
 	buffer[ENEMY_AUDIO_BUFFER_INDEX] =
 		alutCreateBufferFromFile("../sounds/ZombieMono.wav");
-	// Audio de Darth reservado para una futura integracion con OpenAL:
-	// buffer[11] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
+	
+
 	int errorAlut = alutGetError();
 	if (errorAlut != ALUT_ERROR_NO_ERROR){
 		printf("- Error open files with alut %d !!\n", errorAlut);
@@ -1157,20 +1157,20 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		alSourcef(source[sourceIndex], AL_MAX_DISTANCE, 20.0f);
 	}
 
-	/*
-	 * Configuracion de audio de Darth reservada:
-	 * alSourcef(source[DARTH_AUDIO_SOURCE_INDEX], AL_PITCH, 1.0f);
-	 * alSourcef(source[DARTH_AUDIO_SOURCE_INDEX], AL_GAIN, 0.3f);
-	 * alSourcefv(
-	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_POSITION, darthSourcePos);
-	 * alSourcefv(
-	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_VELOCITY, darthSourceVel);
-	 * alSourcei(
-	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_BUFFER, buffer[11]);
-	 * alSourcei(source[DARTH_AUDIO_SOURCE_INDEX], AL_LOOPING, AL_TRUE);
-	 * alSourcef(
-	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_MAX_DISTANCE, 2000);
-	 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
 
 	// Framebuffer para el mapa de profundidad
 	glGenFramebuffers(1, &depthMapFBO);
