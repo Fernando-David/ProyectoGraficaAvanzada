@@ -1,81 +1,55 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
-//glew include
 #include <GL/glew.h>
-
-//std includes
 #include <string>
 #include <iostream>
 #include <limits>
-
-//glfw include
 #include <GLFW/glfw3.h>
-
-// program include
 #include "Headers/TimeManager.h"
-
-// Shader include
 #include "Headers/Shader.h"
-
-// Model geometric includes
 #include "Headers/Sphere.h"
 #include "Headers/Cylinder.h"
 #include "Headers/Box.h"
 #include "Headers/FirstPersonCamera.h"
 #include "Headers/ThirdPersonCamera.h"
 #include "Headers/AerialCamera.h"
-
-// Font rendering include
 #include "Headers/FontTypeRendering.h"
-
-//GLM include
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
 #include "Headers/Texture.h"
-
-// Include loader Model class
 #include "Headers/Model.h"
-
-// Include Terrain
 #include "Headers/Terrain.h"
-
-// Include Colision headers functions
 #include "Headers/Colisiones.h"
-
-// ShadowBox include
 #include "Headers/ShadowBox.h"
-
-// OpenAL include
 #include <AL/alut.h>
 
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(a)/sizeof(a[0]))
 
+// -----------------------------------------------------------------------------
+// Ventana y configuracion de render
+// -----------------------------------------------------------------------------
 int screenWidth;
 int screenHeight;
-
 const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-
 GLFWwindow *window;
 
+// -----------------------------------------------------------------------------
+// Shaders
+// -----------------------------------------------------------------------------
 Shader shader;
-//Shader con skybox
 Shader shaderSkybox;
-//Shader con multiples luces
 Shader shaderMulLighting;
-//Shader para el terreno
 Shader shaderTerrain;
-// Shader para dibujar un objeto con solo textura
 Shader shaderTexture;
-//Shader para dibujar el buffer de profunidad
 Shader shaderDepth;
-// Shader para visualizar el buffer de profundidad
 Shader shaderViewDepth;
-//Shader para las particulas de fuego
 Shader shaderParticlesFire;
 
+// -----------------------------------------------------------------------------
+// Camara y geometria auxiliar
+// -----------------------------------------------------------------------------
 std::shared_ptr<Camera> camera(new ThirdPersonCamera());
 float distanceFromTarget = 7.0;
 const float THIRD_PERSON_TARGET_HEIGHT = 1.25f;
@@ -92,15 +66,16 @@ Cylinder rayModel(10, 10, 1.0, 1.0, 1.0);
 Box boxIntro;
 Box boxHeart;
 Box boxViewDepth;
-// Models complex instances
-// Laberinto models
+
+// -----------------------------------------------------------------------------
+// Declaracion de modelos
+// -----------------------------------------------------------------------------
 Model modelEntrada;
 Model modelSalida;
 Model modelPuertaDer;
 Model modelPuertaIzq;
 Model modelMuroDer;
 Model modelMuroIzq;
-// Laberinto additional walls
 Model modelMuro1;
 Model modelMuro2;
 Model modelMuro3;
@@ -116,29 +91,25 @@ Model modelMuro12;
 Model modelMuro13;
 Model modelMuro14;
 Model modelMuro15;
-// Monedas del laberinto
 Model modelMoneda1;
 Model modelMoneda2;
 Model modelMoneda3;
 Model modelMoneda4;
 Model modelMoneda5;
 Model modelMonedaFalsa;
-// Enemigos
 Model modelEnemy1;
 Model modelEnemy2;
 Model modelEnemy3;
 Model modelEnemy4;
 Model modelEnemy5;
-// Modelos animados
-// Player (replaces Mayow)
 Model playerModelAnimate;
-// Antorcha
 Model modelAntocha;
-// Terrain model instance
 Terrain terrain(-1, -1, 200, 8, "../Textures/heightmap.png");
-
 ShadowBox * shadowBox;
 
+// -----------------------------------------------------------------------------
+// Texturas e interfaz
+// -----------------------------------------------------------------------------
 GLuint textureCespedID, textureWallID, textureWindowID, textureHighwayID, textureLandingPadID;
 GLuint textureTerrainRID, textureTerrainGID, textureTerrainBID, textureTerrainBlendMapID;
 GLuint skyboxTextureID;
@@ -152,7 +123,6 @@ bool iniciaPartida = false;
 bool presionarOpcion = false;
 bool presionarSeleccionMenu = false;
 
-// Modelo para el render del texto
 FontTypeRendering::FontTypeRendering *modelText;
 
 GLenum types[6] = {
@@ -174,7 +144,9 @@ bool exitApp = false;
 int lastMousePosX, offsetX = 0;
 int lastMousePosY, offsetY = 0;
 
-// Model matrix definitions
+// -----------------------------------------------------------------------------
+// Transformaciones y ubicacion de modelos
+// -----------------------------------------------------------------------------
 glm::mat4 modelMatrixPlayer = glm::mat4(1.0f);
 glm::mat4 modelMatrixEntrada = glm::mat4(1.0f);
 glm::mat4 modelMatrixSalida = glm::mat4(1.0f);
@@ -182,7 +154,6 @@ glm::mat4 modelMatrixPuertaDer = glm::mat4(1.0f);
 glm::mat4 modelMatrixPuertaIzq = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuroDer = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuroIzq = glm::mat4(1.0f);
-// matrices for laberinto walls
 glm::mat4 modelMatrixMuro1 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuro2 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMuro3 = glm::mat4(1.0f);
@@ -215,6 +186,9 @@ glm::mat4 baseMatrixEnemy3 = glm::mat4(1.0f);
 glm::mat4 baseMatrixEnemy4 = glm::mat4(1.0f);
 glm::mat4 baseMatrixEnemy5 = glm::mat4(1.0f);
 
+// -----------------------------------------------------------------------------
+// Patrullaje de enemigos
+// -----------------------------------------------------------------------------
 struct EnemyPatrolState {
 	float maxDistance;
 	float traveledDistance;
@@ -235,6 +209,9 @@ const float ENEMY_PATROL_SPEED = 2.25f;
 const float ENEMY_TURN_SPEED = 180.0f;
 const float ENEMY_MODEL_SCALE = 0.0125f;
 
+// -----------------------------------------------------------------------------
+// Estado de la partida
+// -----------------------------------------------------------------------------
 std::vector<bool> monedasActivas = { true, true, true, true, true };
 std::vector<bool> monedasFalsasActivas = { true, true, true, true };
 std::vector<glm::vec3> monedasFalsasPositions = {
@@ -256,7 +233,10 @@ bool puertasAbiertas = false;
 bool juegoGanado = false;
 AbstractModel::AABB triggerPuertaIzq;
 AbstractModel::AABB triggerPuertaDer;
-// Antocha positions
+
+// -----------------------------------------------------------------------------
+// Ubicacion de antorchas
+// -----------------------------------------------------------------------------
 std::vector<glm::vec3> antochaPositions = {
 	glm::vec3(40.5f, 0.0f, -45.0f),
 	glm::vec3(60.5f, 0.0f, 20.0f),
@@ -265,7 +245,10 @@ std::vector<glm::vec3> antochaPositions = {
 	glm::vec3(-74.0f, 0.0f, -24.0f)
 };
 
-int animationPlayerIndex = 0; // 0 = Idle by default for Player
+// -----------------------------------------------------------------------------
+// Controles y animacion del jugador
+// -----------------------------------------------------------------------------
+int animationPlayerIndex = 0;
 int modelSelected = 0;
 bool enableCountSelected = true;
 const float GAMEPAD_DEAD_ZONE = 0.20f;
@@ -273,7 +256,9 @@ const float GAMEPAD_PLAYER_SPEED = 12.0f;
 const float GAMEPAD_PLAYER_TURN_SPEED = 120.0f;
 const float GAMEPAD_CAMERA_SPEED = 3.0f;
 
-// Blending model unsorted
+// -----------------------------------------------------------------------------
+// Transparencias
+// -----------------------------------------------------------------------------
 std::map<std::string, glm::vec3> blendingUnsorted = {
 		{"fire0", antochaPositions[0]},
 		{"fire1", antochaPositions[1]},
@@ -285,14 +270,15 @@ std::map<std::string, glm::vec3> blendingUnsorted = {
 double deltaTime;
 double currTime, lastTime;
 
-
-// Jump variables
+// Salto del jugador
 bool isJump = false;
 float GRAVITY = 5.0;
 double tmv = 0;
 double startTimeJump = 0;
 
-// Colliders
+// -----------------------------------------------------------------------------
+// Colisiones
+// -----------------------------------------------------------------------------
 std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4> > collidersOBB;
 std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4> > collidersSBB;
 std::map<std::string, AbstractModel::AABB> collidersMonedasAABB;
@@ -300,7 +286,9 @@ std::map<std::string, AbstractModel::AABB> collidersMonedasFalsasAABB;
 std::map<std::string, AbstractModel::AABB> collidersMurosAABB;
 std::map<std::string, AbstractModel::OBB> collidersEnemigosOBB;
 
-// OpenAL Defines
+// -----------------------------------------------------------------------------
+// Audio OpenAL
+// -----------------------------------------------------------------------------
 #define NUM_BUFFERS 12
 #define NUM_SOURCES 20
 #define NUM_ENVIRONMENTS 1
@@ -318,7 +306,6 @@ const int MUSIC_BATTLE_2_BUFFER_INDEX = 7;
 const int MUSIC_BATTLE_3_BUFFER_INDEX = 8;
 const int MUSIC_GAME_OVER_BUFFER_INDEX = 9;
 const int ENEMY_AUDIO_BUFFER_INDEX = 10;
-// Listener
 ALfloat listenerPos[] = { 0.0, 0.0, 4.0 };
 ALfloat listenerVel[] = { 0.0, 0.0, 0.0 };
 ALfloat listenerOri[] = { 0.0, 0.0, 1.0, 0.0, 1.0, 0.0 };
@@ -327,19 +314,19 @@ ALfloat listenerOri[] = { 0.0, 0.0, 1.0, 0.0, 1.0, 0.0 };
  * ALfloat darthSourcePos[] = { 2.0, 0.0, 0.0 };
  * ALfloat darthSourceVel[] = { 0.0, 0.0, 0.0 };
  */
-// Buffers
 ALuint buffer[NUM_BUFFERS];
 ALuint source[NUM_SOURCES];
 ALuint environment[NUM_ENVIRONMENTS];
-// Configs
 ALsizei size, freq;
 ALenum format;
 ALvoid *data;
 int ch;
 ALboolean loop;
-// Framesbuffers
+
+// -----------------------------------------------------------------------------
+// Sombras y particulas de fuego
+// -----------------------------------------------------------------------------
 GLuint depthMap, depthMapFBO;
-// Variables para partículas de fuego, estilo fuente
 GLuint fireInitVel;
 GLuint fireStartTime;
 GLuint VAOParticlesFire;
@@ -347,12 +334,14 @@ GLuint VAOParticlesFire;
 GLuint nParticlesFire = 300;
 float fireParticleLifetime = 3.0f;
 
-// OJO: usando GL_POINTS, este tamaño está en píxeles
+// GL_POINTS interpreta este valor en pixeles.
 float fireParticleSize = 35.0f;
 
 double currentTimeFire, lastTimeFire;
 
-// Se definen todos las funciones.
+// -----------------------------------------------------------------------------
+// Declaracion de funciones
+// -----------------------------------------------------------------------------
 void reshapeCallback(GLFWwindow *Window, int widthRes, int heightRes);
 void keyCallback(GLFWwindow *window, int key, int scancode, int action,
 		int mode);
@@ -510,8 +499,7 @@ void initFireParticleBuffers() {
     glBindBuffer(GL_ARRAY_BUFFER, fireStartTime);
     glBufferData(GL_ARRAY_BUFFER, sizeStartTime, NULL, GL_STATIC_DRAW);
 
-    // Velocidades iniciales, parecido a la fuente,
-    // pero con movimiento más vertical y con poca apertura lateral
+    // Movimiento vertical con una apertura lateral reducida.
     GLfloat *data = new GLfloat[nParticlesFire * 3];
 
     glm::vec3 v(0.0f);
@@ -570,7 +558,9 @@ void initFireParticleBuffers() {
     glBindVertexArray(0);
 }
 
-// Implementacion de todas las funciones.
+// -----------------------------------------------------------------------------
+// Inicializacion de OpenGL y recursos
+// -----------------------------------------------------------------------------
 void init(int width, int height, std::string strTitle, bool bFullScreen) {
 
 	if (!glfwInit()) {
@@ -610,7 +600,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	glfwSetScrollCallback(window, scrollCallback);
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
-	// Init glew
+	// Inicializacion de OpenGL
 	glewExperimental = GL_TRUE;
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
@@ -635,7 +625,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	shaderDepth.initialize("../Shaders/shadow_mapping_depth.vs", "../Shaders/shadow_mapping_depth.fs");
 	shaderParticlesFire.initialize("../Shaders/particlesFire.vs", "../Shaders/particlesFire.fs");
 
-	// Inicializacion de los objetos.
+	// Geometria auxiliar
 	skyboxSphere.init();
 	skyboxSphere.setShader(&shaderSkybox);
 	skyboxSphere.setScale(glm::vec3(20.0f, 20.0f, 20.0f));
@@ -677,20 +667,19 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	boxViewDepth.init();
 	boxViewDepth.setShader(&shaderViewDepth);
 
-	// Laberinto models
+	// Modelos del laberinto
 	modelEntrada.loadModel("../models/Laberinto/Entrada.obj");
 	modelEntrada.setShader(&shaderMulLighting);
 	modelSalida.loadModel("../models/Laberinto/Salida.obj");
 	modelSalida.setShader(&shaderMulLighting);
-    // Puertas del laberinto
-    modelPuertaDer.loadModel("../models/Laberinto/PuertaDer.obj"); modelPuertaDer.setShader(&shaderMulLighting);
-    modelPuertaIzq.loadModel("../models/Laberinto/PuertaIzq.obj"); modelPuertaIzq.setShader(&shaderMulLighting);
+	modelPuertaDer.loadModel("../models/Laberinto/PuertaDer.obj"); modelPuertaDer.setShader(&shaderMulLighting);
+	modelPuertaIzq.loadModel("../models/Laberinto/PuertaIzq.obj"); modelPuertaIzq.setShader(&shaderMulLighting);
 	modelMuroDer.loadModel("../models/Laberinto/MuroDer.obj");
 	modelMuroDer.setShader(&shaderMulLighting);
 	modelMuroIzq.loadModel("../models/Laberinto/MuroIzq.obj");
 	modelMuroIzq.setShader(&shaderMulLighting);
 
-	// Load additional muro models
+	// Muros interiores
 	modelMuro1.loadModel("../models/Laberinto/Muro1.obj"); modelMuro1.setShader(&shaderMulLighting);
 	modelMuro2.loadModel("../models/Laberinto/Muro2.obj"); modelMuro2.setShader(&shaderMulLighting);
 	modelMuro3.loadModel("../models/Laberinto/Muro3.obj"); modelMuro3.setShader(&shaderMulLighting);
@@ -724,7 +713,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelEnemy4.loadModel("../models/Enemy/Enemy4.fbx"); modelEnemy4.setShader(&shaderMulLighting);
 	modelEnemy5.loadModel("../models/Enemy/Enemy5.fbx"); modelEnemy5.setShader(&shaderMulLighting);
 
-	// Player
+	// Jugador
 	playerModelAnimate.loadModel("../models/Player/Player.fbx");
 	playerModelAnimate.setShader(&shaderMulLighting);
 	
@@ -744,13 +733,12 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	camera->setDistanceFromTarget(distanceFromTarget);
 	camera->setSensitivity(1.0);
 	
-	// Carga de texturas para el skybox
+	// Textura del skybox
 	Texture skyboxTexture = Texture("");
 	glGenTextures(1, &skyboxTextureID);
-	// Tipo de textura CUBE MAP
 	glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);// set texture wrapping to GL_REPEAT (default wrapping method)
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);// set texture wrapping to GL_REPEAT (default wrapping method)
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -766,141 +754,87 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		skyboxTexture.freeImage();
 	}
 
-	// Definiendo la textura a utilizar
+	// Texturas del escenario
 	Texture textureCesped("../Textures/grassy2.png");
-	// Carga el mapa de bits (FIBITMAP es el tipo de dato de la libreria)
 	textureCesped.loadImage();
-	// Creando la textura con id 1
 	glGenTextures(1, &textureCespedID);
-	// Enlazar esa textura a una tipo de textura de 2D.
 	glBindTexture(GL_TEXTURE_2D, textureCespedID);
-	// set the texture wrapping parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-	// set texture filtering parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	// Verifica si se pudo abrir la textura
 	if (textureCesped.getData()) {
-		// Transferis los datos de la imagen a memoria
-		// Tipo de textura, Mipmaps, Formato interno de openGL, ancho, alto, Mipmaps,
-		// Formato interno de la libreria de la imagen, el tipo de dato y al apuntador
-		// a los datos
-		std::cout << "Numero de canales :=> " << textureCesped.getChannels() << std::endl;
 		glTexImage2D(GL_TEXTURE_2D, 0, textureCesped.getChannels() == 3 ? GL_RGB : GL_RGBA, textureCesped.getWidth(), textureCesped.getHeight(), 0,
 		textureCesped.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureCesped.getData());
-		// Generan los niveles del mipmap (OpenGL es el ecargado de realizarlos)
 		glGenerateMipmap(GL_TEXTURE_2D);
 	} else
 		std::cout << "Failed to load texture" << std::endl;
-	// Libera la memoria de la textura
 	textureCesped.freeImage();
 
-	// Definiendo la textura a utilizar
 	Texture textureWall("../Textures/whiteWall.jpg");
-	// Carga el mapa de bits (FIBITMAP es el tipo de dato de la libreria)
 	textureWall.loadImage();
-	// Creando la textura con id 1
 	glGenTextures(1, &textureWallID);
-	// Enlazar esa textura a una tipo de textura de 2D.
 	glBindTexture(GL_TEXTURE_2D, textureWallID);
-	// set the texture wrapping parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	// set texture filtering parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	// Verifica si se pudo abrir la textura
 	if (textureWall.getData()) {
-		// Transferis los datos de la imagen a memoria
-		// Tipo de textura, Mipmaps, Formato interno de openGL, ancho, alto, Mipmaps,
-		// Formato interno de la libreria de la imagen, el tipo de dato y al apuntador
-		// a los datos
 		glTexImage2D(GL_TEXTURE_2D, 0, textureWall.getChannels() == 3 ? GL_RGB : GL_RGBA, textureWall.getWidth(), textureWall.getHeight(), 0,
 		textureWall.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureWall.getData());
-		// Generan los niveles del mipmap (OpenGL es el ecargado de realizarlos)
 		glGenerateMipmap(GL_TEXTURE_2D);
 	} else
 		std::cout << "Failed to load texture" << std::endl;
-	// Libera la memoria de la textura
 	textureWall.freeImage();
 
-	// Definiendo la textura a utilizar
 	Texture textureWindow("../Textures/ventana.png");
-	// Carga el mapa de bits (FIBITMAP es el tipo de dato de la libreria)
 	textureWindow.loadImage();
-	// Creando la textura con id 1
 	glGenTextures(1, &textureWindowID);
-	// Enlazar esa textura a una tipo de textura de 2D.
 	glBindTexture(GL_TEXTURE_2D, textureWindowID);
-	// set the texture wrapping parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	// set texture filtering parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	// Verifica si se pudo abrir la textura
 	if (textureWindow.getData()) {
-		// Transferis los datos de la imagen a memoria
-		// Tipo de textura, Mipmaps, Formato interno de openGL, ancho, alto, Mipmaps,
-		// Formato interno de la libreria de la imagen, el tipo de dato y al apuntador
-		// a los datos
 		glTexImage2D(GL_TEXTURE_2D, 0, textureWindow.getChannels() == 3 ? GL_RGB : GL_RGBA, textureWindow.getWidth(), textureWindow.getHeight(), 0,
 		textureWindow.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureWindow.getData());
-		// Generan los niveles del mipmap (OpenGL es el ecargado de realizarlos)
 		glGenerateMipmap(GL_TEXTURE_2D);
 	} else
 		std::cout << "Failed to load texture" << std::endl;
-	// Libera la memoria de la textura
 	textureWindow.freeImage();
 
-	// Definiendo la textura a utilizar
 	Texture textureHighway("../Textures/highway.jpg");
-	// Carga el mapa de bits (FIBITMAP es el tipo de dato de la libreria)
 	textureHighway.loadImage();
-	// Creando la textura con id 1
 	glGenTextures(1, &textureHighwayID);
-	// Enlazar esa textura a una tipo de textura de 2D.
 	glBindTexture(GL_TEXTURE_2D, textureHighwayID);
-	// set the texture wrapping parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	// set texture filtering parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	// Verifica si se pudo abrir la textura
 	if (textureHighway.getData()) {
-		// Transferis los datos de la imagen a memoria
-		// Tipo de textura, Mipmaps, Formato interno de openGL, ancho, alto, Mipmaps,
-		// Formato interno de la libreria de la imagen, el tipo de dato y al apuntador
-		// a los datos
 		glTexImage2D(GL_TEXTURE_2D, 0, textureHighway.getChannels() == 3 ? GL_RGB : GL_RGBA, textureHighway.getWidth(), textureHighway.getHeight(), 0,
 		textureHighway.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureHighway.getData());
-		// Generan los niveles del mipmap (OpenGL es el ecargado de realizarlos)
 		glGenerateMipmap(GL_TEXTURE_2D);
 	} else
 		std::cout << "Failed to load texture" << std::endl;
-	// Libera la memoria de la textura
 	textureHighway.freeImage();
 
-	// Definiendo la textura
 	Texture textureLandingPad("../Textures/landingPad.jpg");
-	textureLandingPad.loadImage(); // Cargar la textura
-	glGenTextures(1, &textureLandingPadID); // Creando el id de la textura del landingpad
-	glBindTexture(GL_TEXTURE_2D, textureLandingPadID); // Se enlaza la textura
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // Wrapping en el eje u
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // Wrapping en el eje v
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Filtering de minimización
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Filtering de maximimizacion
+	textureLandingPad.loadImage();
+	glGenTextures(1, &textureLandingPadID);
+	glBindTexture(GL_TEXTURE_2D, textureLandingPadID);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	if(textureLandingPad.getData()){
-		// Transferir los datos de la imagen a la tarjeta
 		glTexImage2D(GL_TEXTURE_2D, 0, textureLandingPad.getChannels() == 3 ? GL_RGB : GL_RGBA, textureLandingPad.getWidth(), textureLandingPad.getHeight(), 0,
 		textureLandingPad.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureLandingPad.getData());
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
 	else 
 		std::cout << "Fallo la carga de textura" << std::endl;
-	textureLandingPad.freeImage(); // Liberamos memoria
+	textureLandingPad.freeImage();
 
 	// Defininiendo texturas del mapa de mezclas
 	// Definiendo la textura
@@ -1194,24 +1128,23 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		alutCreateBufferFromFile("../sounds/4_1_StoryChaboon.wav");
 	buffer[ENEMY_AUDIO_BUFFER_INDEX] =
 		alutCreateBufferFromFile("../sounds/ZombieMono.wav");
-	// Audio de Darth reservado:
-	// buffer[12] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
+	// Audio de Darth reservado para una futura integracion con OpenAL:
+	// buffer[11] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
 	int errorAlut = alutGetError();
 	if (errorAlut != ALUT_ERROR_NO_ERROR){
 		printf("- Error open files with alut %d !!\n", errorAlut);
 		exit(2);
 	}
 
-	alGetError(); /* clear error */
+	alGetError();
 	alGenSources(NUM_SOURCES, source);
 
 	if (alGetError() != AL_NO_ERROR) {
 		printf("- Error creating sources !!\n");
 		exit(2);
 	}
-	else {
-		printf("init - no errors after alGenSources\n");
-	}
+
+	// Fuentes de audio espacial
 	for (int i = 0; i < antochaPositions.size(); i++) {
 		const int sourceIndex = TORCH_AUDIO_SOURCE_START + i;
 		ALfloat torchAudioPosition[] = {
@@ -1325,16 +1258,13 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	 * alSourcefv(
 	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_VELOCITY, darthSourceVel);
 	 * alSourcei(
-	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_BUFFER, buffer[12]);
+	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_BUFFER, buffer[11]);
 	 * alSourcei(source[DARTH_AUDIO_SOURCE_INDEX], AL_LOOPING, AL_TRUE);
 	 * alSourcef(
 	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_MAX_DISTANCE, 2000);
 	 */
 
-	/*******************************************
-	 * Inicializacion del framebuffer para
-	 * almacenar el buffer de profunidadad
-	 *******************************************/
+	// Framebuffer para el mapa de profundidad
 	glGenFramebuffers(1, &depthMapFBO);
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
@@ -1352,7 +1282,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	//inicializacion de los datos de la particula de fuego
+	// Particulas de fuego
 	initFireParticleBuffers();
 	lastTimeFire = TimeManager::Instance().GetTime();
 }
@@ -1360,17 +1290,15 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 void destroy() {
 	glfwDestroyWindow(window);
 	glfwTerminate();
-	// --------- IMPORTANTE ----------
-	// Eliminar los shader y buffers creados.
 
-	// Shaders Delete
+	// Shaders
 	shader.destroy();
 	shaderMulLighting.destroy();
 	shaderSkybox.destroy();
 	shaderTerrain.destroy();
 	shaderParticlesFire.destroy();
 
-	// Basic objects Delete
+	// Geometria auxiliar
 	skyboxSphere.destroy();
 	boxCesped.destroy();
 	boxWalls.destroy();
@@ -1384,7 +1312,7 @@ void destroy() {
 	boxHeart.destroy();
 	boxViewDepth.destroy();
 
-	// Custom objects Delete
+	// Modelos
 	modelMoneda1.destroy();
 	modelMoneda2.destroy();
 	modelMoneda3.destroy();
@@ -1398,10 +1326,9 @@ void destroy() {
 	modelEnemy5.destroy();
 	modelAntocha.destroy();
 	playerModelAnimate.destroy();
-	// Terrains objects Delete
 	terrain.destroy();
 
-	// Textures Delete
+	// Texturas
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDeleteTextures(1, &textureCespedID);
 	glDeleteTextures(1, &textureWallID);
@@ -1433,6 +1360,9 @@ void destroy() {
 
 }
 
+// -----------------------------------------------------------------------------
+// Callbacks de ventana y entrada
+// -----------------------------------------------------------------------------
 void reshapeCallback(GLFWwindow *Window, int widthRes, int heightRes) {
 	screenWidth = widthRes;
 	screenHeight = heightRes;
@@ -1463,22 +1393,11 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset){
 }
 
 void mouseButtonCallback(GLFWwindow *window, int button, int state, int mod) {
-	if (state == GLFW_PRESS) {
-		switch (button) {
-		case GLFW_MOUSE_BUTTON_RIGHT:
-			std::cout << "lastMousePos.y:" << lastMousePosY << std::endl;
-			break;
-		case GLFW_MOUSE_BUTTON_LEFT:
-			std::cout << "lastMousePos.x:" << lastMousePosX << std::endl;
-			break;
-		case GLFW_MOUSE_BUTTON_MIDDLE:
-			std::cout << "lastMousePos.x:" << lastMousePosX << std::endl;
-			std::cout << "lastMousePos.y:" << lastMousePosY << std::endl;
-			break;
-		}
-	}
 }
 
+// -----------------------------------------------------------------------------
+// Controles de menu, camara y jugador
+// -----------------------------------------------------------------------------
 bool processInput(bool continueApplication) {
 	if (exitApp || glfwWindowShouldClose(window) != 0) {
 		return false;
@@ -1592,8 +1511,7 @@ bool processInput(bool continueApplication) {
 				}
 			}
 
-			// Solo el stick derecho controla la camara. Los gatillos
-			// GLFW_GAMEPAD_AXIS_LEFT_TRIGGER y RIGHT_TRIGGER se ignoran.
+			// Los gatillos no modifican la inclinacion de la camara.
 			const float cameraX =
 				fabs(rightX) > GAMEPAD_DEAD_ZONE
 					? rightX * GAMEPAD_CAMERA_SPEED : 0.0f;
@@ -1621,7 +1539,7 @@ bool processInput(bool continueApplication) {
 	offsetX = 0;
 	offsetY = 0;
 
-	// Seleccionar modelo
+	// Seleccion de camara
 	if (enableCountSelected && glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS){
 		enableCountSelected = false;
 		modelSelected++;
@@ -1629,23 +1547,20 @@ bool processInput(bool continueApplication) {
 			modelSelected = 0;
 		if (modelSelected == 1) {
 			camera = std::shared_ptr<Camera>(new FirstPersonCamera(glm::vec3(0.0, 3.0, 4.0)));
-			camera->setSensitivity(5.0f); // Mayor sensibilidad para giro con mouse
-			std::cout << "Free camera mode active" << std::endl;
+			camera->setSensitivity(5.0f);
 		} else if (modelSelected == 2) {
 			camera = std::shared_ptr<Camera>(new AerialCamera(glm::vec3(0.0, 30.0, 0.0)));
 			camera->setSensitivity(1.0f);
-			std::cout << "Aerial camera mode active" << std::endl;
 		} else {
 			camera = std::shared_ptr<Camera>(new ThirdPersonCamera());
 			camera->setDistanceFromTarget(distanceFromTarget);
 			camera->setSensitivity(1.0f);
 		}
-		std::cout << "modelSelected:" << modelSelected << std::endl;
 	}
 	else if(glfwGetKey(window, GLFW_KEY_TAB) == GLFW_RELEASE)
 		enableCountSelected = true;
 
-	// Controles del player
+	// Movimiento del jugador con teclado
 	if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS){
 		modelMatrixPlayer = glm::rotate(modelMatrixPlayer, 0.05f, glm::vec3(0, 1, 0));
 		animationPlayerIndex = 0;
@@ -1655,26 +1570,11 @@ bool processInput(bool continueApplication) {
 	}
 	if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS){
 		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, 0.5));
-		animationPlayerIndex = 1; // run when moving forward
+		animationPlayerIndex = 1;
 	}
 	else if (modelSelected == 0 && glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS){
 		modelMatrixPlayer = glm::translate(modelMatrixPlayer, glm::vec3(0.0, 0.0, -0.5));
-		animationPlayerIndex = 2; // run backward
-	}
-
-	// Animation placeholders / manual overrides for testing
-	if (modelSelected == 0) {
-		if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) animationPlayerIndex = 0; // idle
-		if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) animationPlayerIndex = 2; // Runback
-		if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) animationPlayerIndex = 3; // Block
-		if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) animationPlayerIndex = 4; // death
-		if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS) animationPlayerIndex = 5; // idle
-		if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS) animationPlayerIndex = 6; // run back
-		// keys 7/8 left as optional extra clips if present
-		if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS) animationPlayerIndex = 7; //death
-		if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS) animationPlayerIndex = 8;
-		if (glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS) animationPlayerIndex = 9;
-		if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) animationPlayerIndex = 1; //Run
+		animationPlayerIndex = 2;
 	}
 
 	if (modelSelected == 1) {
@@ -1723,14 +1623,12 @@ bool processInput(bool continueApplication) {
 	return continueApplication;
 }
 
+// -----------------------------------------------------------------------------
+// Preparacion y renderizado de la escena
+// -----------------------------------------------------------------------------
 void prepareScene(){
 
 	terrain.setShader(&shaderTerrain);
-	
-	//Grass
-	//modelGrass.setShader(&shaderMulLighting);
-
-	//Player
 	playerModelAnimate.setShader(&shaderMulLighting);
 
 	// Monedas del laberinto
@@ -1753,11 +1651,6 @@ void prepareScene(){
 void prepareDepthScene(){
 
 	terrain.setShader(&shaderDepth);
-	
-	//Grass
-	//modelGrass.setShader(&shaderDepth);
-
-	//Player
 	playerModelAnimate.setShader(&shaderDepth);
 
 	// Monedas del laberinto
@@ -1814,12 +1707,10 @@ void renderSolidScene(){
 	modelMuroDer.render(modelMatrixMuroDer);
 	modelMuroIzq.render(modelMatrixMuroIzq);
 
-	// Forze to enable the unit texture to 0 always ----------------- IMPORTANT
+	// Los modelos usan la unidad de textura base.
 	glActiveTexture(GL_TEXTURE0);
 
-	/*****************************************
-	 * Objetos animados por huesos
-	 * **************************************/
+	// Modelos animados
 	glm::vec3 ejey = glm::normalize(terrain.getNormalTerrain(modelMatrixPlayer[3][0], modelMatrixPlayer[3][2]));
 	glm::vec3 ejex = glm::vec3(modelMatrixPlayer[0]);
 	glm::vec3 ejez = glm::normalize(glm::cross(ejex, ejey));
@@ -1838,7 +1729,6 @@ void renderSolidScene(){
 	modelMatrixPlayerBody = glm::rotate(modelMatrixPlayerBody, glm::radians(180.0f), glm::vec3(0, 1, 0));
 	playerModelAnimate.setAnimationIndex(animationPlayerIndex);
 	playerModelAnimate.render(modelMatrixPlayerBody);
-	//animationPlayerIndex = 1;
 
 	// Enemigos
 	modelMatrixEnemy1[3][1] = terrain.getHeightTerrain(
@@ -1870,46 +1760,44 @@ void renderSolidScene(){
 		modelAntocha.render(modelMatrixAntocha);
 	}
 
-		// Laberinto walls additional
-		modelMuro1.render(glm::scale(modelMatrixMuro1, glm::vec3(0.5f)));
-		modelMuro2.render(glm::scale(modelMatrixMuro2, glm::vec3(0.5f)));
-		modelMuro3.render(glm::scale(modelMatrixMuro3, glm::vec3(0.5f)));
-		modelMuro4.render(glm::scale(modelMatrixMuro4, glm::vec3(0.5f)));
-		modelMuro5.render(glm::scale(modelMatrixMuro5, glm::vec3(0.5f)));
-		modelMuro6.render(glm::scale(modelMatrixMuro6, glm::vec3(0.5f)));
-		modelMuro7.render(glm::scale(modelMatrixMuro7, glm::vec3(0.5f)));
-		modelMuro8.render(glm::scale(modelMatrixMuro8, glm::vec3(0.5f)));
-		modelMuro9.render(glm::scale(modelMatrixMuro9, glm::vec3(0.5f)));
-		modelMuro10.render(glm::scale(modelMatrixMuro10, glm::vec3(0.5f)));
-		modelMuro11.render(glm::scale(modelMatrixMuro11, glm::vec3(0.5f)));
-		modelMuro12.render(glm::scale(modelMatrixMuro12, glm::vec3(0.5f)));
-		modelMuro13.render(glm::scale(modelMatrixMuro13, glm::vec3(0.5f)));
-		modelMuro14.render(glm::scale(modelMatrixMuro14, glm::vec3(0.5f)));
-		modelMuro15.render(glm::scale(modelMatrixMuro15, glm::vec3(0.5f)));
+	// Muros interiores
+	modelMuro1.render(glm::scale(modelMatrixMuro1, glm::vec3(0.5f)));
+	modelMuro2.render(glm::scale(modelMatrixMuro2, glm::vec3(0.5f)));
+	modelMuro3.render(glm::scale(modelMatrixMuro3, glm::vec3(0.5f)));
+	modelMuro4.render(glm::scale(modelMatrixMuro4, glm::vec3(0.5f)));
+	modelMuro5.render(glm::scale(modelMatrixMuro5, glm::vec3(0.5f)));
+	modelMuro6.render(glm::scale(modelMatrixMuro6, glm::vec3(0.5f)));
+	modelMuro7.render(glm::scale(modelMatrixMuro7, glm::vec3(0.5f)));
+	modelMuro8.render(glm::scale(modelMatrixMuro8, glm::vec3(0.5f)));
+	modelMuro9.render(glm::scale(modelMatrixMuro9, glm::vec3(0.5f)));
+	modelMuro10.render(glm::scale(modelMatrixMuro10, glm::vec3(0.5f)));
+	modelMuro11.render(glm::scale(modelMatrixMuro11, glm::vec3(0.5f)));
+	modelMuro12.render(glm::scale(modelMatrixMuro12, glm::vec3(0.5f)));
+	modelMuro13.render(glm::scale(modelMatrixMuro13, glm::vec3(0.5f)));
+	modelMuro14.render(glm::scale(modelMatrixMuro14, glm::vec3(0.5f)));
+	modelMuro15.render(glm::scale(modelMatrixMuro15, glm::vec3(0.5f)));
 
-		// Monedas del laberinto. Sus posiciones ya vienen incorporadas en los OBJ.
-		if (monedasActivas[0])
-			modelMoneda1.render(glm::scale(modelMatrixMoneda1, glm::vec3(0.5f)));
-		if (monedasActivas[1])
-			modelMoneda2.render(glm::scale(modelMatrixMoneda2, glm::vec3(0.5f)));
-		if (monedasActivas[2])
-			modelMoneda3.render(glm::scale(modelMatrixMoneda3, glm::vec3(0.5f)));
-		if (monedasActivas[3])
-			modelMoneda4.render(glm::scale(modelMatrixMoneda4, glm::vec3(0.5f)));
-		if (monedasActivas[4])
-			modelMoneda5.render(glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
+	// Monedas del laberinto. Sus posiciones vienen en los archivos OBJ.
+	if (monedasActivas[0])
+		modelMoneda1.render(glm::scale(modelMatrixMoneda1, glm::vec3(0.5f)));
+	if (monedasActivas[1])
+		modelMoneda2.render(glm::scale(modelMatrixMoneda2, glm::vec3(0.5f)));
+	if (monedasActivas[2])
+		modelMoneda3.render(glm::scale(modelMatrixMoneda3, glm::vec3(0.5f)));
+	if (monedasActivas[3])
+		modelMoneda4.render(glm::scale(modelMatrixMoneda4, glm::vec3(0.5f)));
+	if (monedasActivas[4])
+		modelMoneda5.render(glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
 
-		for (int i = 0; i < monedasFalsasActivas.size(); i++) {
-			if (monedasFalsasActivas[i])
-				modelMonedaFalsa.render(modelMatricesMonedasFalsas[i]);
-		}
+	for (int i = 0; i < monedasFalsasActivas.size(); i++) {
+		if (monedasFalsasActivas[i])
+			modelMonedaFalsa.render(modelMatricesMonedasFalsas[i]);
+	}
 
-	/*******************************************
-	 * Skybox
-	 *******************************************/
+	// Skybox
 	GLint oldCullFaceMode;
 	GLint oldDepthFuncMode;
-	// deshabilita el modo del recorte de caras ocultas para ver las esfera desde adentro
+	// Invierte el recorte para visualizar la esfera desde dentro.
 	glGetIntegerv(GL_CULL_FACE_MODE, &oldCullFaceMode);
 	glGetIntegerv(GL_DEPTH_FUNC, &oldDepthFuncMode);
 	shaderSkybox.setFloat("skybox", 0);
@@ -2029,6 +1917,9 @@ void renderScene(){
 	renderAlphaScene(false);
 }
 
+// -----------------------------------------------------------------------------
+// Ciclo principal y logica de juego
+// -----------------------------------------------------------------------------
 void applicationLoop() {
 	bool psi = true;
 
@@ -2567,22 +2458,6 @@ void applicationLoop() {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		/*******************************************
-		 * Debug to view the texture view map
-		 *******************************************/
-		// reset viewport
-		/*glViewport(0, 0, screenWidth, screenHeight);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		// render Depth map to quad for visual debugging
-		shaderViewDepth.setMatrix4("projection", 1, false, glm::value_ptr(glm::mat4(1.0)));
-		shaderViewDepth.setMatrix4("view", 1, false, glm::value_ptr(glm::mat4(1.0)));
-		shaderViewDepth.setFloat("near_plane", near_plane);
-		shaderViewDepth.setFloat("far_plane", far_plane);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, depthMap);
-		boxViewDepth.setScale(glm::vec3(2.0, 2.0, 1.0));
-		boxViewDepth.render();*/
-
-		/*******************************************
 		 * 2.- We render the normal objects
 		 *******************************************/
 		glViewport(0, 0, screenWidth, screenHeight);
@@ -2594,33 +2469,25 @@ void applicationLoop() {
 		shaderTerrain.setInt("shadowMap", 10);
 		renderSolidScene();
 
-		/*******************************************
-		 * Creacion de colliders
-		 * IMPORTANT do this before interpolations
-		 *******************************************/
+		// Creacion y actualizacion de colliders
 		// Collider del player
 		AbstractModel::OBB playerCollider;
 		glm::mat4 modelmatrixColliderPlayer = glm::mat4(modelMatrixPlayer);
 
-		// Aplicar la misma rotacion visual que se usa en el render ANTES del scale
-		// El player usa rotate(180 Y) en lugar del rotate(-90 X) de Mayow
+		// La caja usa la misma rotacion visual del jugador.
 		modelmatrixColliderPlayer = glm::rotate(modelmatrixColliderPlayer,
 			glm::radians(180.0f), glm::vec3(0, 1, 0));
 
-		// Extraer el quaternion ANTES del scale (igual que Mayow)
 		playerCollider.u = glm::quat_cast(modelmatrixColliderPlayer);
 
-		// Ahora si aplicar el scale (igual que Mayow usaba 0.021)
 		modelmatrixColliderPlayer = glm::scale(modelmatrixColliderPlayer,
 			glm::vec3(0.015f, 0.015f, 0.015f));
 
-		// Trasladar al centro local del OBB del modelo
 		modelmatrixColliderPlayer = glm::translate(modelmatrixColliderPlayer,
 			glm::vec3(playerModelAnimate.getObb().c.x,
 					playerModelAnimate.getObb().c.y,
 					playerModelAnimate.getObb().c.z));
 
-		// Half-extents con el mismo scale uniforme
 		playerCollider.e = playerModelAnimate.getObb().e * glm::vec3(0.0085f, 0.015f, 0.0085f);
 		playerCollider.c = glm::vec3(modelmatrixColliderPlayer[3]);
 
@@ -2829,10 +2696,10 @@ void applicationLoop() {
 			}
 		}
 
-		/**********Render de transparencias***************/
+		// Transparencias
 		renderAlphaScene();
 
-		/*********************Prueba de colisiones****************************/
+		// Resolucion de colisiones y eventos de juego
 		AbstractModel::AABB playerAABB = obbToAABB(playerCollider);
 		if (vidasJugador > 0
 				&& currTime - ultimoDanioJugador
@@ -2935,8 +2802,6 @@ void applicationLoop() {
 				collidersMurosAABB.begin();
 				it != collidersMurosAABB.end(); it++) {
 			if (testAABBAABB(playerAABB, it->second)) {
-				std::cout << "Colision del jugador con " << it->first
-						<< std::endl;
 				addOrUpdateCollisionDetection(
 					collisionDetection, "player", true);
 				break;
@@ -2952,8 +2817,6 @@ void applicationLoop() {
 				collidersSBB.begin(); jt != collidersSBB.end(); jt++) {
 				if (it != jt && testSphereSphereIntersection(
 					std::get<0>(it->second), std::get<0>(jt->second))) {
-					std::cout << "Hay collision entre " << it->first <<
-						" y el modelo " << jt->first << std::endl;
 					isCollision = true;
 				}
 			}
@@ -2969,8 +2832,6 @@ void applicationLoop() {
 				collidersOBB.begin(); jt != collidersOBB.end(); jt++) {
 				if (it != jt && 
 					testOBBOBB(std::get<0>(it->second), std::get<0>(jt->second))) {
-					std::cout << "Hay colision entre " << it->first << " y el modelo" <<
-						jt->first << std::endl;
 					isColision = true;
 				}
 			}
@@ -2985,8 +2846,6 @@ void applicationLoop() {
 				std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4>>::iterator jt =
 				collidersOBB.begin(); jt != collidersOBB.end(); jt++) {
 				if (testSphereOBox(std::get<0>(it->second), std::get<0>(jt->second))) {
-					std::cout << "Hay colision del " << it->first << " y el modelo" <<
-						jt->first << std::endl;
 					isCollision = true;
 					addOrUpdateCollisionDetection(collisionDetection, jt->first, true);
 				}
@@ -3035,29 +2894,16 @@ void applicationLoop() {
 			iterator itSBB;
 		for (itSBB = collidersSBB.begin(); itSBB != collidersSBB.end(); itSBB++) {
 			float tRint;
-			if (raySphereIntersect(ori, targetRay, rayDirection,
-				std::get<0>(itSBB->second), tRint)) {
-				std::cout << "Collision del rayo con el modelo " << itSBB->first 
-				<< std::endl;
-			}
+			raySphereIntersect(ori, targetRay, rayDirection,
+				std::get<0>(itSBB->second), tRint);
 		}
-		/*std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4>>::
-			iterator itOBB;
-		for (itOBB = collidersOBB.begin(); itOBB != collidersOBB.end(); itOBB++) {
-			if (testRayOBB(ori, targetRay, std::get<0>(itOBB->second))) {
-				std::cout << "Collision del rayo con el modelo " << itOBB->first
-					<< std::endl;
-			}
-		}*/
 
 		if (!animacionMuerteActiva)
-			animationPlayerIndex = 0; // keep idle by default
+			animationPlayerIndex = 0;
 
 		glfwSwapBuffers(window);
 
-		/****************************+
-		 * Open AL sound data
-		 */
+		// Actualizacion de audio espacial
 		/*
 		 * Actualizacion de la fuente de Darth reservada:
 		 * darthSourcePos[0] = modelMatrixDarth[3].x;
@@ -3068,7 +2914,6 @@ void applicationLoop() {
 		 *     AL_POSITION, darthSourcePos);
 		 */
 
-		// Listener for the Third person camera
 		listenerPos[0] = modelMatrixPlayer[3].x;
 		listenerPos[1] = modelMatrixPlayer[3].y;
 		listenerPos[2] = modelMatrixPlayer[3].z;
@@ -3144,22 +2989,14 @@ void applicationLoop() {
 		listenerOri[4] = upModel.y;
 		listenerOri[5] = upModel.z;
 
-		// Listener for the First person camera
-		// listenerPos[0] = camera->getPosition().x;
-		// listenerPos[1] = camera->getPosition().y;
-		// listenerPos[2] = camera->getPosition().z;
-		// alListenerfv(AL_POSITION, listenerPos);
-		// listenerOri[0] = camera->getFront().x;
-		// listenerOri[1] = camera->getFront().y;
-		// listenerOri[2] = camera->getFront().z;
-		// listenerOri[3] = camera->getUp().x;
-		// listenerOri[4] = camera->getUp().y;
-		// listenerOri[5] = camera->getUp().z;
 		alListenerfv(AL_ORIENTATION, listenerOri);
 
 	}
 }
 
+// -----------------------------------------------------------------------------
+// Punto de entrada
+// -----------------------------------------------------------------------------
 int main(int argc, char **argv) {
 	init(800, 700, "Window GLFW", false);
 	applicationLoop();
