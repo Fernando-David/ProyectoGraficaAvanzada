@@ -8,7 +8,6 @@
 #include "Headers/TimeManager.h"
 #include "Headers/Shader.h"
 #include "Headers/Sphere.h"
-#include "Headers/Cylinder.h"
 #include "Headers/Box.h"
 #include "Headers/FirstPersonCamera.h"
 #include "Headers/ThirdPersonCamera.h"
@@ -56,13 +55,7 @@ const float THIRD_PERSON_TARGET_HEIGHT = 1.25f;
 
 Sphere skyboxSphere(20, 20);
 Box boxCesped;
-Box boxWalls;
-Box boxHighway;
-Box boxLandingPad;
 Sphere esfera1(10, 10);
-Box boxCollider;
-Sphere sphereCollider(10, 10);
-Cylinder rayModel(10, 10, 1.0, 1.0, 1.0);
 Box boxIntro;
 Box boxHeart;
 Box boxViewDepth;
@@ -110,7 +103,7 @@ ShadowBox * shadowBox;
 // -----------------------------------------------------------------------------
 // Texturas e interfaz
 // -----------------------------------------------------------------------------
-GLuint textureCespedID, textureWallID, textureWindowID, textureHighwayID, textureLandingPadID;
+GLuint textureCespedID;
 GLuint textureTerrainRID, textureTerrainGID, textureTerrainBID, textureTerrainBlendMapID;
 GLuint skyboxTextureID;
 GLuint textureInit1ID, textureInit2ID, textureActivaID;
@@ -631,29 +624,8 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	skyboxSphere.setShader(&shaderSkybox);
 	skyboxSphere.setScale(glm::vec3(20.0f, 20.0f, 20.0f));
 
-	boxCollider.init();
-	boxCollider.setShader(&shader);
-	boxCollider.setColor(glm::vec4(1.0, 1.0, 1.0, 1.0));
-
-	sphereCollider.init();
-	sphereCollider.setShader(&shader);
-	sphereCollider.setColor(glm::vec4(1.0, 1.0, 1.0, 1.0));
-
-	rayModel.init();
-	rayModel.setShader(&shader);
-	rayModel.setColor(glm::vec4(1.0));
-
 	boxCesped.init();
 	boxCesped.setShader(&shaderMulLighting);
-
-	boxWalls.init();
-	boxWalls.setShader(&shaderMulLighting);
-
-	boxHighway.init();
-	boxHighway.setShader(&shaderMulLighting);
-
-	boxLandingPad.init();
-	boxLandingPad.setShader(&shaderMulLighting);
 
 	esfera1.init();
 	esfera1.setShader(&shaderMulLighting);
@@ -771,71 +743,6 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	} else
 		std::cout << "Failed to load texture" << std::endl;
 	textureCesped.freeImage();
-
-	Texture textureWall("../Textures/whiteWall.jpg");
-	textureWall.loadImage();
-	glGenTextures(1, &textureWallID);
-	glBindTexture(GL_TEXTURE_2D, textureWallID);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	if (textureWall.getData()) {
-		glTexImage2D(GL_TEXTURE_2D, 0, textureWall.getChannels() == 3 ? GL_RGB : GL_RGBA, textureWall.getWidth(), textureWall.getHeight(), 0,
-		textureWall.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureWall.getData());
-		glGenerateMipmap(GL_TEXTURE_2D);
-	} else
-		std::cout << "Failed to load texture" << std::endl;
-	textureWall.freeImage();
-
-	Texture textureWindow("../Textures/ventana.png");
-	textureWindow.loadImage();
-	glGenTextures(1, &textureWindowID);
-	glBindTexture(GL_TEXTURE_2D, textureWindowID);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	if (textureWindow.getData()) {
-		glTexImage2D(GL_TEXTURE_2D, 0, textureWindow.getChannels() == 3 ? GL_RGB : GL_RGBA, textureWindow.getWidth(), textureWindow.getHeight(), 0,
-		textureWindow.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureWindow.getData());
-		glGenerateMipmap(GL_TEXTURE_2D);
-	} else
-		std::cout << "Failed to load texture" << std::endl;
-	textureWindow.freeImage();
-
-	Texture textureHighway("../Textures/highway.jpg");
-	textureHighway.loadImage();
-	glGenTextures(1, &textureHighwayID);
-	glBindTexture(GL_TEXTURE_2D, textureHighwayID);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	if (textureHighway.getData()) {
-		glTexImage2D(GL_TEXTURE_2D, 0, textureHighway.getChannels() == 3 ? GL_RGB : GL_RGBA, textureHighway.getWidth(), textureHighway.getHeight(), 0,
-		textureHighway.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureHighway.getData());
-		glGenerateMipmap(GL_TEXTURE_2D);
-	} else
-		std::cout << "Failed to load texture" << std::endl;
-	textureHighway.freeImage();
-
-	Texture textureLandingPad("../Textures/landingPad.jpg");
-	textureLandingPad.loadImage();
-	glGenTextures(1, &textureLandingPadID);
-	glBindTexture(GL_TEXTURE_2D, textureLandingPadID);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	if(textureLandingPad.getData()){
-		glTexImage2D(GL_TEXTURE_2D, 0, textureLandingPad.getChannels() == 3 ? GL_RGB : GL_RGBA, textureLandingPad.getWidth(), textureLandingPad.getHeight(), 0,
-		textureLandingPad.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureLandingPad.getData());
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else 
-		std::cout << "Fallo la carga de textura" << std::endl;
-	textureLandingPad.freeImage();
 
 	// Defininiendo texturas del mapa de mezclas
 	// Definiendo la textura
@@ -1302,13 +1209,7 @@ void destroy() {
 	// Geometria auxiliar
 	skyboxSphere.destroy();
 	boxCesped.destroy();
-	boxWalls.destroy();
-	boxHighway.destroy();
-	boxLandingPad.destroy();
 	esfera1.destroy();
-	boxCollider.destroy();
-	sphereCollider.destroy();
-	rayModel.destroy();
 	boxIntro.destroy();
 	boxHeart.destroy();
 	boxViewDepth.destroy();
@@ -1332,10 +1233,6 @@ void destroy() {
 	// Texturas
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDeleteTextures(1, &textureCespedID);
-	glDeleteTextures(1, &textureWallID);
-	glDeleteTextures(1, &textureWindowID);
-	glDeleteTextures(1, &textureHighwayID);
-	glDeleteTextures(1, &textureLandingPadID);
 	glDeleteTextures(1, &textureTerrainBID);
 	glDeleteTextures(1, &textureTerrainGID);
 	glDeleteTextures(1, &textureTerrainRID);
@@ -2612,99 +2509,6 @@ void applicationLoop() {
 			modelMuro15.getAAbb(),
 			glm::scale(modelMatrixMuro15, glm::vec3(0.5f)));
 
-		/*******************************************
-		 * Render de colliders
-		 *******************************************/
-		for (std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4> >::iterator it =
-				collidersOBB.begin(); it != collidersOBB.end(); it++) {
-			glm::mat4 matrixCollider = glm::mat4(1.0);
-			matrixCollider = glm::translate(matrixCollider, std::get<0>(it->second).c);
-			matrixCollider = matrixCollider * glm::mat4(std::get<0>(it->second).u);
-			matrixCollider = glm::scale(matrixCollider, std::get<0>(it->second).e * 2.0f);
-			boxCollider.setColor(glm::vec4(1.0, 1.0, 1.0, 1.0));
-			boxCollider.enableWireMode();
-			boxCollider.render(matrixCollider);
-		}
-
-		for (std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4> >::iterator it =
-				collidersSBB.begin(); it != collidersSBB.end(); it++) {
-			glm::mat4 matrixCollider = glm::mat4(1.0);
-			matrixCollider = glm::translate(matrixCollider, std::get<0>(it->second).c);
-			matrixCollider = glm::scale(matrixCollider, glm::vec3(std::get<0>(it->second).ratio * 2.0f));
-			sphereCollider.setColor(glm::vec4(1.0, 1.0, 1.0, 1.0));
-			sphereCollider.enableWireMode();
-			sphereCollider.render(matrixCollider);
-		}
-
-		for (std::map<std::string, AbstractModel::AABB>::iterator it =
-				collidersMonedasAABB.begin();
-				it != collidersMonedasAABB.end(); it++) {
-			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
-			glm::vec3 size = it->second.maxs - it->second.mins;
-			glm::mat4 matrixCollider = glm::translate(glm::mat4(1.0f), center);
-			matrixCollider = glm::scale(matrixCollider, size);
-			boxCollider.setColor(glm::vec4(1.0, 0.85, 0.0, 1.0));
-			boxCollider.enableWireMode();
-			boxCollider.render(matrixCollider);
-		}
-
-		for (std::map<std::string, AbstractModel::AABB>::iterator it =
-				collidersMonedasFalsasAABB.begin();
-				it != collidersMonedasFalsasAABB.end(); it++) {
-			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
-			glm::vec3 size = it->second.maxs - it->second.mins;
-			glm::mat4 matrixCollider =
-				glm::translate(glm::mat4(1.0f), center);
-			matrixCollider = glm::scale(matrixCollider, size);
-			boxCollider.setColor(glm::vec4(1.0, 0.0, 1.0, 1.0));
-			boxCollider.enableWireMode();
-			boxCollider.render(matrixCollider);
-		}
-
-		for (std::map<std::string, AbstractModel::AABB>::iterator it =
-				collidersMurosAABB.begin();
-				it != collidersMurosAABB.end(); it++) {
-			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
-			glm::vec3 size = it->second.maxs - it->second.mins;
-			glm::mat4 matrixCollider = glm::translate(glm::mat4(1.0f), center);
-			matrixCollider = glm::scale(matrixCollider, size);
-			boxCollider.setColor(glm::vec4(1.0, 0.0, 0.0, 1.0));
-			boxCollider.enableWireMode();
-			boxCollider.render(matrixCollider);
-		}
-
-		for (std::map<std::string, AbstractModel::OBB>::iterator it =
-				collidersEnemigosOBB.begin();
-				it != collidersEnemigosOBB.end(); it++) {
-			glm::mat4 matrixCollider = glm::translate(
-				glm::mat4(1.0f), it->second.c);
-			matrixCollider = matrixCollider * glm::mat4(it->second.u);
-			matrixCollider = glm::scale(
-				matrixCollider, it->second.e * 2.0f);
-			boxCollider.setColor(glm::vec4(1.0, 0.45, 0.0, 1.0));
-			boxCollider.enableWireMode();
-			boxCollider.render(matrixCollider);
-		}
-
-		if (puertasAbiertas) {
-			AbstractModel::AABB triggersPuertas[2] = {
-				triggerPuertaIzq, triggerPuertaDer
-			};
-			for (int i = 0; i < 2; i++) {
-				glm::vec3 center =
-					(triggersPuertas[i].mins + triggersPuertas[i].maxs)
-					* 0.5f;
-				glm::vec3 size =
-					triggersPuertas[i].maxs - triggersPuertas[i].mins;
-				glm::mat4 matrixCollider =
-					glm::translate(glm::mat4(1.0f), center);
-				matrixCollider = glm::scale(matrixCollider, size);
-				boxCollider.setColor(glm::vec4(0.0, 1.0, 0.0, 1.0));
-				boxCollider.enableWireMode();
-				boxCollider.render(matrixCollider);
-			}
-		}
-
 		// Transparencias
 		renderAlphaScene();
 
@@ -2883,28 +2687,6 @@ void applicationLoop() {
 						modelMatrixPlayer = std::get<1>(obbBuscado->second);
 				}
 			}
-		}
-
-		glm::mat4 modelMatrixRayPlayer = glm::mat4(modelMatrixPlayer);
-		modelMatrixRayPlayer = glm::translate(modelMatrixRayPlayer, glm::vec3(0, 1, 0));
-		float maxDistanceRay = 10.0;
-		glm::vec3 rayDirection = modelMatrixRayPlayer[2];
-		glm::vec3 ori = modelMatrixRayPlayer[3];
-		glm::vec3 rmd = ori + rayDirection * (maxDistanceRay / 2.0f);
-		glm::vec3 targetRay = ori + rayDirection * maxDistanceRay;
-		modelMatrixRayPlayer[3] = glm::vec4(rmd, 1.0);
-		modelMatrixRayPlayer = glm::rotate(modelMatrixRayPlayer, glm::radians(90.0f), 
-			glm::vec3(1, 0, 0));
-		modelMatrixRayPlayer = glm::scale(modelMatrixRayPlayer, 
-			glm::vec3(0.05, maxDistanceRay, 0.05));
-		rayModel.render(modelMatrixRayPlayer);
-
-		std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4>>::
-			iterator itSBB;
-		for (itSBB = collidersSBB.begin(); itSBB != collidersSBB.end(); itSBB++) {
-			float tRint;
-			raySphereIntersect(ori, targetRay, rayDirection,
-				std::get<0>(itSBB->second), tRint);
 		}
 
 		if (!animacionMuerteActiva)
