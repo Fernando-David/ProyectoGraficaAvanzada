@@ -124,6 +124,7 @@ Model modelMoneda2;
 Model modelMoneda3;
 Model modelMoneda4;
 Model modelMoneda5;
+Model modelMonedaFalsa;
 // Enemigos
 Model modelEnemy1;
 Model modelEnemy2;
@@ -146,6 +147,7 @@ GLuint textureCespedID, textureWallID, textureWindowID, textureHighwayID, textur
 GLuint textureTerrainRID, textureTerrainGID, textureTerrainBID, textureTerrainBlendMapID;
 GLuint skyboxTextureID;
 GLuint textureInit1ID, textureInit2ID, textureActivaID;
+GLuint textureGameOverID, textureVictoriaID;
 GLuint textureScreenID, textureScreen1LifeID, textureScreen0LivesID;
 GLuint textureHeartID;
 GLuint textureParticleFountainID;
@@ -207,6 +209,7 @@ glm::mat4 modelMatrixMoneda2 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda3 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda4 = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoneda5 = glm::mat4(1.0f);
+std::vector<glm::mat4> modelMatricesMonedasFalsas(4, glm::mat4(1.0f));
 glm::mat4 modelMatrixEnemy1 = glm::mat4(1.0f);
 glm::mat4 modelMatrixEnemy2 = glm::mat4(1.0f);
 glm::mat4 modelMatrixEnemy3 = glm::mat4(1.0f);
@@ -238,10 +241,22 @@ const float ENEMY_PATROL_SPEED = 2.25f;
 const float ENEMY_TURN_SPEED = 180.0f;
 
 std::vector<bool> monedasActivas = { true, true, true, true, true };
+std::vector<bool> monedasFalsasActivas = { true, true, true, true };
+std::vector<glm::vec3> monedasFalsasPositions = {
+	glm::vec3(15.0f, 4.0f, 40.0f),
+	glm::vec3(-65.0f, 4.0f, -65.0f),
+	glm::vec3(-57.5f, 4.0f, -7.5f),
+	glm::vec3(65.0f, 4.0f, -10.0f)
+};
+std::vector<glm::vec3> monedaAudioPositions(5, glm::vec3(0.0f));
 int contadorMonedas = 0;
 int vidasJugador = 3;
 double ultimoDanioJugador = -10.0;
 const double TIEMPO_INVULNERABILIDAD = 1.0;
+const double DURACION_ANIMACION_MUERTE = 2.5;
+bool animacionMuerteActiva = false;
+bool pantallaGameOverActiva = false;
+double inicioAnimacionMuerte = 0.0;
 bool puertasAbiertas = false;
 bool juegoGanado = false;
 AbstractModel::AABB triggerPuertaIzq;
@@ -287,13 +302,20 @@ double startTimeJump = 0;
 std::map<std::string, std::tuple<AbstractModel::OBB, glm::mat4, glm::mat4> > collidersOBB;
 std::map<std::string, std::tuple<AbstractModel::SBB, glm::mat4, glm::mat4> > collidersSBB;
 std::map<std::string, AbstractModel::AABB> collidersMonedasAABB;
+std::map<std::string, AbstractModel::AABB> collidersMonedasFalsasAABB;
 std::map<std::string, AbstractModel::AABB> collidersMurosAABB;
 std::map<std::string, AbstractModel::OBB> collidersEnemigosOBB;
 
 // OpenAL Defines
-#define NUM_BUFFERS 3
-#define NUM_SOURCES 3
+#define NUM_BUFFERS 7
+#define NUM_SOURCES 15
 #define NUM_ENVIRONMENTS 1
+const int TORCH_AUDIO_SOURCE_START = 1;
+const int COIN_AUDIO_SOURCE_START = 6;
+const int COIN_PICKUP_SOURCE_INDEX = 11;
+const int PLAYER_HURT_SOURCE_INDEX = 12;
+const int DOOR_OPEN_SOURCE_INDEX = 13;
+const int DARTH_AUDIO_SOURCE_INDEX = 14;
 // Listener
 ALfloat listenerPos[] = { 0.0, 0.0, 4.0 };
 ALfloat listenerVel[] = { 0.0, 0.0, 0.0 };
@@ -303,8 +325,8 @@ ALfloat source0Pos[] = { -2.0, 0.0, 0.0 };
 ALfloat source0Vel[] = { 0.0, 0.0, 0.0 };
 /*
  * Audio de Darth reservado para una futura integracion con OpenAL.
- * ALfloat source2Pos[] = { 2.0, 0.0, 0.0 };
- * ALfloat source2Vel[] = { 0.0, 0.0, 0.0 };
+ * ALfloat darthSourcePos[] = { 2.0, 0.0, 0.0 };
+ * ALfloat darthSourceVel[] = { 0.0, 0.0, 0.0 };
  */
 // Buffers
 ALuint buffer[NUM_BUFFERS];
@@ -316,7 +338,10 @@ ALenum format;
 ALvoid *data;
 int ch;
 ALboolean loop;
-std::vector<bool> sourcesPlay = {true};
+std::vector<bool> sourcesPlay = {
+	true, false, false, false, false, false,
+	false, false, false, false, false, false, false, false
+};
 
 // Framesbuffers
 GLuint depthMap, depthMapFBO;
@@ -765,6 +790,9 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	modelMoneda3.loadModel("../models/Laberinto/Moneda3.obj"); modelMoneda3.setShader(&shaderMulLighting);
 	modelMoneda4.loadModel("../models/Laberinto/Moneda4.obj"); modelMoneda4.setShader(&shaderMulLighting);
 	modelMoneda5.loadModel("../models/Laberinto/Moneda5.obj"); modelMoneda5.setShader(&shaderMulLighting);
+	// MonedaZero.obj no esta disponible; Moneda1 se recentra como modelo base.
+	modelMonedaFalsa.loadModel("../models/Laberinto/Moneda1.obj");
+	modelMonedaFalsa.setShader(&shaderMulLighting);
 
 	// Enemigos
 	modelEnemy1.loadModel("../models/Enemy/Enemy1.fbx"); modelEnemy1.setShader(&shaderMulLighting);
@@ -1070,6 +1098,34 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		std::cout << "Fallo la carga de textura" << std::endl;
 	textureIntro2.freeImage(); // Liberamos memoria
 
+	auto loadFullscreenTexture = [](const std::string &path, GLuint &textureID) {
+		Texture texture(path);
+		texture.loadImage();
+		glGenTextures(1, &textureID);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		if (texture.getData()) {
+			GLenum format =
+				texture.getChannels() == 3 ? GL_RGB : GL_RGBA;
+			glTexImage2D(
+				GL_TEXTURE_2D, 0, format,
+				texture.getWidth(), texture.getHeight(), 0,
+				format, GL_UNSIGNED_BYTE, texture.getData());
+			glGenerateMipmap(GL_TEXTURE_2D);
+		}
+		else {
+			std::cout << "Fallo la carga de textura: " << path
+					<< std::endl;
+		}
+		texture.freeImage();
+	};
+
+	loadFullscreenTexture("../Textures/GameOver.png", textureGameOverID);
+	loadFullscreenTexture("../Textures/Victoria.png", textureVictoriaID);
+
 	// Definiendo la textura
 	Texture textureScreen("../Textures/Screen.png");
 	textureScreen.loadImage(); // Cargar la textura
@@ -1210,6 +1266,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	alListenerfv(AL_POSITION, listenerPos);
 	alListenerfv(AL_VELOCITY, listenerVel);
 	alListenerfv(AL_ORIENTATION, listenerOri);
+	alDistanceModel(AL_LINEAR_DISTANCE_CLAMPED);
 	alGetError(); // clear any error messages
 	if (alGetError() != AL_NO_ERROR) {
 		printf("- Error creating buffers !!\n");
@@ -1221,8 +1278,13 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	// Generate buffers, or else no sound will happen!
 	alGenBuffers(NUM_BUFFERS, buffer);
 	buffer[0] = alutCreateBufferFromFile("../sounds/fountain.wav");
+	buffer[1] = alutCreateBufferFromFile("../sounds/FuegoMono.wav");
+	buffer[2] = alutCreateBufferFromFile("../sounds/BrillanteMono.wav");
+	buffer[3] = alutCreateBufferFromFile("../sounds/MonedaMono.wav");
+	buffer[4] = alutCreateBufferFromFile("../sounds/Hurt.wav");
+	buffer[5] = alutCreateBufferFromFile("../sounds/Puerta.wav");
 	// Audio de Darth reservado:
-	// buffer[2] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
+	// buffer[6] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
 	int errorAlut = alutGetError();
 	if (errorAlut != ALUT_ERROR_NO_ERROR){
 		printf("- Error open files with alut %d !!\n", errorAlut);
@@ -1245,17 +1307,98 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	alSourcefv(source[0], AL_VELOCITY, source0Vel);
 	alSourcei(source[0], AL_BUFFER, buffer[0]);
 	alSourcei(source[0], AL_LOOPING, AL_TRUE);
-	alSourcef(source[0], AL_MAX_DISTANCE, 2000);
+	alSourcei(source[0], AL_SOURCE_RELATIVE, AL_FALSE);
+	alSourcef(source[0], AL_REFERENCE_DISTANCE, 5.0f);
+	alSourcef(source[0], AL_ROLLOFF_FACTOR, 1.0f);
+	alSourcef(source[0], AL_MAX_DISTANCE, 25.0f);
+
+	for (int i = 0; i < antochaPositions.size(); i++) {
+		const int sourceIndex = TORCH_AUDIO_SOURCE_START + i;
+		ALfloat torchAudioPosition[] = {
+			antochaPositions[i].x,
+			antochaPositions[i].y + 1.5f,
+			antochaPositions[i].z
+		};
+		ALfloat torchAudioVelocity[] = { 0.0f, 0.0f, 0.0f };
+
+		alSourcef(source[sourceIndex], AL_PITCH, 1.0f);
+		alSourcef(source[sourceIndex], AL_GAIN, 0.30f);
+		alSourcefv(
+			source[sourceIndex], AL_POSITION, torchAudioPosition);
+		alSourcefv(
+			source[sourceIndex], AL_VELOCITY, torchAudioVelocity);
+		alSourcei(source[sourceIndex], AL_BUFFER, buffer[1]);
+		alSourcei(source[sourceIndex], AL_LOOPING, AL_TRUE);
+		alSourcei(
+			source[sourceIndex], AL_SOURCE_RELATIVE, AL_FALSE);
+		alSourcef(source[sourceIndex], AL_REFERENCE_DISTANCE, 3.0f);
+		alSourcef(source[sourceIndex], AL_ROLLOFF_FACTOR, 1.0f);
+		alSourcef(source[sourceIndex], AL_MAX_DISTANCE, 18.0f);
+	}
+
+	for (int i = 0; i < monedasActivas.size(); i++) {
+		const int sourceIndex = COIN_AUDIO_SOURCE_START + i;
+		alSourcef(source[sourceIndex], AL_PITCH, 1.0f);
+		alSourcef(source[sourceIndex], AL_GAIN, 0.50f);
+		alSourcei(source[sourceIndex], AL_BUFFER, buffer[2]);
+		alSourcei(source[sourceIndex], AL_LOOPING, AL_TRUE);
+		alSourcei(
+			source[sourceIndex], AL_SOURCE_RELATIVE, AL_FALSE);
+		alSourcef(source[sourceIndex], AL_REFERENCE_DISTANCE, 2.0f);
+		alSourcef(source[sourceIndex], AL_ROLLOFF_FACTOR, 1.0f);
+		alSourcef(source[sourceIndex], AL_MAX_DISTANCE, 40.0f);
+	}
+
+	alSourcef(source[COIN_PICKUP_SOURCE_INDEX], AL_PITCH, 1.0f);
+	alSourcef(source[COIN_PICKUP_SOURCE_INDEX], AL_GAIN, 0.65f);
+	alSourcei(
+		source[COIN_PICKUP_SOURCE_INDEX], AL_BUFFER, buffer[3]);
+	alSourcei(source[COIN_PICKUP_SOURCE_INDEX], AL_LOOPING, AL_FALSE);
+	alSourcei(
+		source[COIN_PICKUP_SOURCE_INDEX], AL_SOURCE_RELATIVE, AL_FALSE);
+	alSourcef(
+		source[COIN_PICKUP_SOURCE_INDEX], AL_REFERENCE_DISTANCE, 2.0f);
+	alSourcef(
+		source[COIN_PICKUP_SOURCE_INDEX], AL_ROLLOFF_FACTOR, 1.0f);
+	alSourcef(
+		source[COIN_PICKUP_SOURCE_INDEX], AL_MAX_DISTANCE, 15.0f);
+
+	alSourcef(source[PLAYER_HURT_SOURCE_INDEX], AL_PITCH, 1.0f);
+	alSourcef(source[PLAYER_HURT_SOURCE_INDEX], AL_GAIN, 0.75f);
+	alSourcei(
+		source[PLAYER_HURT_SOURCE_INDEX], AL_BUFFER, buffer[4]);
+	alSourcei(
+		source[PLAYER_HURT_SOURCE_INDEX], AL_LOOPING, AL_FALSE);
+	alSourcei(
+		source[PLAYER_HURT_SOURCE_INDEX], AL_SOURCE_RELATIVE, AL_TRUE);
+	alSource3f(
+		source[PLAYER_HURT_SOURCE_INDEX], AL_POSITION,
+		0.0f, 0.0f, 0.0f);
+
+	alSourcef(source[DOOR_OPEN_SOURCE_INDEX], AL_PITCH, 1.0f);
+	alSourcef(source[DOOR_OPEN_SOURCE_INDEX], AL_GAIN, 0.80f);
+	alSourcei(
+		source[DOOR_OPEN_SOURCE_INDEX], AL_BUFFER, buffer[5]);
+	alSourcei(source[DOOR_OPEN_SOURCE_INDEX], AL_LOOPING, AL_FALSE);
+	alSourcei(
+		source[DOOR_OPEN_SOURCE_INDEX], AL_SOURCE_RELATIVE, AL_TRUE);
+	alSource3f(
+		source[DOOR_OPEN_SOURCE_INDEX], AL_POSITION,
+		0.0f, 0.0f, 0.0f);
 
 	/*
 	 * Configuracion de audio de Darth reservada:
-	 * alSourcef(source[2], AL_PITCH, 1.0f);
-	 * alSourcef(source[2], AL_GAIN, 0.3f);
-	 * alSourcefv(source[2], AL_POSITION, source2Pos);
-	 * alSourcefv(source[2], AL_VELOCITY, source2Vel);
-	 * alSourcei(source[2], AL_BUFFER, buffer[2]);
-	 * alSourcei(source[2], AL_LOOPING, AL_TRUE);
-	 * alSourcef(source[2], AL_MAX_DISTANCE, 2000);
+	 * alSourcef(source[DARTH_AUDIO_SOURCE_INDEX], AL_PITCH, 1.0f);
+	 * alSourcef(source[DARTH_AUDIO_SOURCE_INDEX], AL_GAIN, 0.3f);
+	 * alSourcefv(
+	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_POSITION, darthSourcePos);
+	 * alSourcefv(
+	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_VELOCITY, darthSourceVel);
+	 * alSourcei(
+	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_BUFFER, buffer[6]);
+	 * alSourcei(source[DARTH_AUDIO_SOURCE_INDEX], AL_LOOPING, AL_TRUE);
+	 * alSourcef(
+	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_MAX_DISTANCE, 2000);
 	 */
 
 	/*******************************************
@@ -1320,6 +1463,7 @@ void destroy() {
 	modelMoneda3.destroy();
 	modelMoneda4.destroy();
 	modelMoneda5.destroy();
+	modelMonedaFalsa.destroy();
 	modelEnemy1.destroy();
 	modelEnemy2.destroy();
 	modelEnemy3.destroy();
@@ -1345,6 +1489,8 @@ void destroy() {
 	glDeleteTextures(1, &textureTerrainBlendMapID);
 	glDeleteTextures(1, &textureInit1ID);
 	glDeleteTextures(1, &textureInit2ID);
+	glDeleteTextures(1, &textureGameOverID);
+	glDeleteTextures(1, &textureVictoriaID);
 	glDeleteTextures(1, &textureScreenID);
 	glDeleteTextures(1, &textureScreen1LifeID);
 	glDeleteTextures(1, &textureScreen0LivesID);
@@ -1463,6 +1609,24 @@ bool processInput(bool continueApplication) {
 		else if (!cambiarOpcion) {
 			presionarOpcion = false;
 		}
+	}
+
+	if (animacionMuerteActiva || pantallaGameOverActiva || juegoGanado) {
+		if (animacionMuerteActiva) {
+			glfwPollEvents();
+			return continueApplication;
+		}
+		const bool cerrarPantallaFinal =
+			glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS
+			|| (gamepadConnected
+				&& gamepadState.buttons[GLFW_GAMEPAD_BUTTON_START]
+					== GLFW_PRESS);
+		if (cerrarPantallaFinal) {
+			exitApp = true;
+			return false;
+		}
+		glfwPollEvents();
+		return continueApplication;
 	}
 
 	if (iniciaPartida && gamepadConnected) {
@@ -1654,6 +1818,7 @@ void prepareScene(){
 	modelMoneda3.setShader(&shaderMulLighting);
 	modelMoneda4.setShader(&shaderMulLighting);
 	modelMoneda5.setShader(&shaderMulLighting);
+	modelMonedaFalsa.setShader(&shaderMulLighting);
 
 	modelEnemy1.setShader(&shaderMulLighting);
 	modelEnemy2.setShader(&shaderMulLighting);
@@ -1683,6 +1848,7 @@ void prepareDepthScene(){
 	modelMoneda3.setShader(&shaderDepth);
 	modelMoneda4.setShader(&shaderDepth);
 	modelMoneda5.setShader(&shaderDepth);
+	modelMonedaFalsa.setShader(&shaderDepth);
 
 	modelEnemy1.setShader(&shaderDepth);
 	modelEnemy2.setShader(&shaderDepth);
@@ -1816,6 +1982,11 @@ void renderSolidScene(){
 			modelMoneda4.render(glm::scale(modelMatrixMoneda4, glm::vec3(0.5f)));
 		if (monedasActivas[4])
 			modelMoneda5.render(glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
+
+		for (int i = 0; i < monedasFalsasActivas.size(); i++) {
+			if (monedasFalsasActivas[i])
+				modelMonedaFalsa.render(modelMatricesMonedasFalsas[i]);
+		}
 
 	/*******************************************
 	 * Skybox
@@ -2052,6 +2223,35 @@ void applicationLoop() {
 	modelMatrixMoneda3 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
 	modelMatrixMoneda4 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
 	modelMatrixMoneda5 = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+	Model *monedaModels[] = {
+		&modelMoneda1, &modelMoneda2, &modelMoneda3,
+		&modelMoneda4, &modelMoneda5
+	};
+	glm::mat4 *monedaMatrices[] = {
+		&modelMatrixMoneda1, &modelMatrixMoneda2, &modelMatrixMoneda3,
+		&modelMatrixMoneda4, &modelMatrixMoneda5
+	};
+	for (int i = 0; i < monedasActivas.size(); i++) {
+		const AbstractModel::AABB monedaAABB = transformAABB(
+			monedaModels[i]->getAAbb(),
+			glm::scale(*monedaMatrices[i], glm::vec3(0.5f)));
+		monedaAudioPositions[i] =
+			(monedaAABB.mins + monedaAABB.maxs) * 0.5f;
+		alSourcefv(
+			source[COIN_AUDIO_SOURCE_START + i], AL_POSITION,
+			glm::value_ptr(monedaAudioPositions[i]));
+	}
+	const AbstractModel::AABB monedaFalsaBaseAABB =
+		modelMonedaFalsa.getAAbb();
+	const glm::vec3 monedaFalsaBaseCenter =
+		(monedaFalsaBaseAABB.mins + monedaFalsaBaseAABB.maxs) * 0.5f;
+	for (int i = 0; i < monedasFalsasPositions.size(); i++) {
+		glm::mat4 matrix = glm::translate(
+			glm::mat4(1.0f), monedasFalsasPositions[i]);
+		matrix = glm::scale(matrix, glm::vec3(0.5f));
+		matrix = glm::translate(matrix, -monedaFalsaBaseCenter);
+		modelMatricesMonedasFalsas[i] = matrix;
+	}
 	//Limites del laberinto
 	modelMatrixEntrada = glm::translate(modelMatrixEntrada, glm::vec3(0.0f, 1.0f, 0.0f));
 	modelMatrixEntrada = glm::rotate(modelMatrixEntrada, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -2108,6 +2308,15 @@ void applicationLoop() {
 		deltaTime = TimeManager::Instance().DeltaTime;
 		psi = processInput(true);
 
+		if (animacionMuerteActiva) {
+			animationPlayerIndex = 4;
+			if (currTime - inicioAnimacionMuerte
+					>= DURACION_ANIMACION_MUERTE) {
+				animacionMuerteActiva = false;
+				pantallaGameOverActiva = true;
+			}
+		}
+
 		float patrolDeltaTime = glm::min(
 			static_cast<float>(deltaTime), 0.1f);
 		updateEnemyPatrol(
@@ -2162,6 +2371,8 @@ void applicationLoop() {
 				modelMatrixPuertaDer, -pivotePuertaDer);
 
 			puertasAbiertas = true;
+			alSourceStop(source[DOOR_OPEN_SOURCE_INDEX]);
+			alSourcePlay(source[DOOR_OPEN_SOURCE_INDEX]);
 			std::cout << "Todas las monedas recolectadas. Puertas abiertas."
 					<< std::endl;
 		}
@@ -2425,6 +2636,23 @@ void applicationLoop() {
 		shaderTerrain.setFloat(playerLight + ".quadratic", 0.017f);
 
 		/************Render de imagen de frente**************/
+		if (pantallaGameOverActiva || juegoGanado) {
+			shaderTexture.setMatrix4(
+				"projection", 1, false,
+				glm::value_ptr(glm::mat4(1.0f)));
+			shaderTexture.setMatrix4(
+				"view", 1, false,
+				glm::value_ptr(glm::mat4(1.0f)));
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(
+				GL_TEXTURE_2D,
+				juegoGanado ? textureVictoriaID : textureGameOverID);
+			shaderTexture.setInt("outTexture", 0);
+			boxIntro.render();
+			glfwSwapBuffers(window);
+			continue;
+		}
+
 		if(!iniciaPartida){
 			shaderTexture.setMatrix4("projection", 1, false, glm::value_ptr(glm::mat4(1.0)));
 			shaderTexture.setMatrix4("view", 1, false, glm::value_ptr(glm::mat4(1.0)));
@@ -2547,6 +2775,17 @@ void applicationLoop() {
 				modelMoneda5.getAAbb(),
 				glm::scale(modelMatrixMoneda5, glm::vec3(0.5f)));
 
+		collidersMonedasFalsasAABB.clear();
+		for (int i = 0; i < monedasFalsasActivas.size(); i++) {
+			if (monedasFalsasActivas[i]) {
+				collidersMonedasFalsasAABB[
+					"MonedaFalsa-" + std::to_string(i + 1)] =
+					transformAABB(
+						modelMonedaFalsa.getAAbb(),
+						modelMatricesMonedasFalsas[i]);
+			}
+		}
+
 		// Colliders AABB de los muros. Las etiquetas "Muro-" identifican
 		// elementos solidos que deben bloquear el movimiento del jugador.
 		collidersMurosAABB.clear();
@@ -2647,6 +2886,19 @@ void applicationLoop() {
 		}
 
 		for (std::map<std::string, AbstractModel::AABB>::iterator it =
+				collidersMonedasFalsasAABB.begin();
+				it != collidersMonedasFalsasAABB.end(); it++) {
+			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
+			glm::vec3 size = it->second.maxs - it->second.mins;
+			glm::mat4 matrixCollider =
+				glm::translate(glm::mat4(1.0f), center);
+			matrixCollider = glm::scale(matrixCollider, size);
+			boxCollider.setColor(glm::vec4(1.0, 0.0, 1.0, 1.0));
+			boxCollider.enableWireMode();
+			boxCollider.render(matrixCollider);
+		}
+
+		for (std::map<std::string, AbstractModel::AABB>::iterator it =
 				collidersMurosAABB.begin();
 				it != collidersMurosAABB.end(); it++) {
 			glm::vec3 center = (it->second.mins + it->second.maxs) * 0.5f;
@@ -2704,12 +2956,20 @@ void applicationLoop() {
 				if (testOBBOBB(playerCollider, it->second)) {
 					vidasJugador--;
 					ultimoDanioJugador = currTime;
+					alSourceStop(source[PLAYER_HURT_SOURCE_INDEX]);
+					alSourcePlay(source[PLAYER_HURT_SOURCE_INDEX]);
 					std::cout << it->first
 							<< " hizo danio al jugador. Vidas restantes: "
 							<< vidasJugador << std::endl;
-					if (vidasJugador == 0)
+					if (vidasJugador == 0) {
+						animacionMuerteActiva = true;
+						inicioAnimacionMuerte = currTime;
+						animationPlayerIndex = 4;
+						isJump = false;
+						tmv = 0.0;
 						std::cout << "El jugador se ha quedado sin vidas."
 								<< std::endl;
+					}
 					break;
 				}
 			}
@@ -2725,9 +2985,42 @@ void applicationLoop() {
 						&& monedasActivas[monedaIndex]) {
 					monedasActivas[monedaIndex] = false;
 					contadorMonedas++;
+					const int coinSourceIndex =
+						COIN_AUDIO_SOURCE_START + monedaIndex;
+					alSourceStop(source[coinSourceIndex]);
+					alSourceStop(source[COIN_PICKUP_SOURCE_INDEX]);
+					alSourcefv(
+						source[COIN_PICKUP_SOURCE_INDEX], AL_POSITION,
+						glm::value_ptr(
+							monedaAudioPositions[monedaIndex]));
+					alSourcePlay(source[COIN_PICKUP_SOURCE_INDEX]);
 					std::cout << it->first << " recolectada. Monedas: "
 							<< contadorMonedas << std::endl;
 				}
+			}
+		}
+
+		for (std::map<std::string, AbstractModel::AABB>::iterator it =
+				collidersMonedasFalsasAABB.begin();
+				it != collidersMonedasFalsasAABB.end(); it++) {
+			if (testAABBAABB(playerAABB, it->second)) {
+				int monedaFalsaIndex =
+					std::stoi(it->first.substr(12)) - 1;
+				if (monedaFalsaIndex >= 0
+						&& monedaFalsaIndex < monedasFalsasActivas.size()
+						&& monedasFalsasActivas[monedaFalsaIndex]) {
+					monedasFalsasActivas[monedaFalsaIndex] = false;
+					vidasJugador = 0;
+					animacionMuerteActiva = true;
+					inicioAnimacionMuerte = currTime;
+					animationPlayerIndex = 4;
+					isJump = false;
+					tmv = 0.0;
+					std::cout << it->first
+							<< " era una trampa. El jugador ha muerto."
+							<< std::endl;
+				}
+				break;
 			}
 		}
 
@@ -2857,7 +3150,8 @@ void applicationLoop() {
 			}
 		}*/
 
-		animationPlayerIndex = 0; // keep idle by default
+		if (!animacionMuerteActiva)
+			animationPlayerIndex = 0; // keep idle by default
 
 		glfwSwapBuffers(window);
 
@@ -2871,10 +3165,12 @@ void applicationLoop() {
 
 		/*
 		 * Actualizacion de la fuente de Darth reservada:
-		 * source2Pos[0] = modelMatrixDarth[3].x;
-		 * source2Pos[1] = modelMatrixDarth[3].y;
-		 * source2Pos[2] = modelMatrixDarth[3].z;
-		 * alSourcefv(source[2], AL_POSITION, source2Pos);
+		 * darthSourcePos[0] = modelMatrixDarth[3].x;
+		 * darthSourcePos[1] = modelMatrixDarth[3].y;
+		 * darthSourcePos[2] = modelMatrixDarth[3].z;
+		 * alSourcefv(
+		 *     source[DARTH_AUDIO_SOURCE_INDEX],
+		 *     AL_POSITION, darthSourcePos);
 		 */
 
 		// Listener for the Third person camera
@@ -2882,6 +3178,42 @@ void applicationLoop() {
 		listenerPos[1] = modelMatrixPlayer[3].y;
 		listenerPos[2] = modelMatrixPlayer[3].z;
 		alListenerfv(AL_POSITION, listenerPos);
+
+		const glm::vec3 playerAudioPosition(listenerPos[0], listenerPos[1],
+			listenerPos[2]);
+		for (int i = 0; i < antochaPositions.size(); i++) {
+			const int sourceIndex = TORCH_AUDIO_SOURCE_START + i;
+			const glm::vec3 torchAudioPosition =
+				antochaPositions[i] + glm::vec3(0.0f, 1.5f, 0.0f);
+			const bool playerInTorchAudioRange =
+				glm::distance(
+					playerAudioPosition, torchAudioPosition) <= 18.0f;
+			ALint sourceState;
+			alGetSourcei(source[sourceIndex], AL_SOURCE_STATE, &sourceState);
+
+			if (playerInTorchAudioRange && sourceState != AL_PLAYING)
+				alSourcePlay(source[sourceIndex]);
+			else if (!playerInTorchAudioRange
+					&& sourceState == AL_PLAYING)
+				alSourcePause(source[sourceIndex]);
+		}
+
+		for (int i = 0; i < monedasActivas.size(); i++) {
+			const int sourceIndex = COIN_AUDIO_SOURCE_START + i;
+			const bool playerInCoinAudioRange =
+				glm::distance(
+					playerAudioPosition, monedaAudioPositions[i])
+					<= 20.0f;
+			ALint sourceState;
+			alGetSourcei(source[sourceIndex], AL_SOURCE_STATE, &sourceState);
+
+			if (monedasActivas[i] && playerInCoinAudioRange
+					&& sourceState != AL_PLAYING)
+				alSourcePlay(source[sourceIndex]);
+			else if ((!monedasActivas[i] || !playerInCoinAudioRange)
+					&& sourceState == AL_PLAYING)
+				alSourcePause(source[sourceIndex]);
+		}
 
 		glm::vec3 upModel = glm::normalize(modelMatrixPlayer[1]);
 		glm::vec3 frontModel = glm::normalize(modelMatrixPlayer[2]);
