@@ -239,6 +239,7 @@ const int ENEMY_ANIMATION_TURN = 19;
 const int ENEMY_ANIMATION_WALK = 24;
 const float ENEMY_PATROL_SPEED = 2.25f;
 const float ENEMY_TURN_SPEED = 180.0f;
+const float ENEMY_MODEL_SCALE = 0.0125f;
 
 std::vector<bool> monedasActivas = { true, true, true, true, true };
 std::vector<bool> monedasFalsasActivas = { true, true, true, true };
@@ -307,15 +308,23 @@ std::map<std::string, AbstractModel::AABB> collidersMurosAABB;
 std::map<std::string, AbstractModel::OBB> collidersEnemigosOBB;
 
 // OpenAL Defines
-#define NUM_BUFFERS 7
-#define NUM_SOURCES 15
+#define NUM_BUFFERS 13
+#define NUM_SOURCES 21
 #define NUM_ENVIRONMENTS 1
 const int TORCH_AUDIO_SOURCE_START = 1;
 const int COIN_AUDIO_SOURCE_START = 6;
 const int COIN_PICKUP_SOURCE_INDEX = 11;
 const int PLAYER_HURT_SOURCE_INDEX = 12;
 const int DOOR_OPEN_SOURCE_INDEX = 13;
-const int DARTH_AUDIO_SOURCE_INDEX = 14;
+const int BACKGROUND_MUSIC_SOURCE_INDEX = 14;
+const int ENEMY_AUDIO_SOURCE_START = 15;
+const int DARTH_AUDIO_SOURCE_INDEX = 20;
+const int MUSIC_MENU_BUFFER_INDEX = 6;
+const int MUSIC_BATTLE_1_BUFFER_INDEX = 7;
+const int MUSIC_BATTLE_2_BUFFER_INDEX = 8;
+const int MUSIC_BATTLE_3_BUFFER_INDEX = 9;
+const int MUSIC_GAME_OVER_BUFFER_INDEX = 10;
+const int ENEMY_AUDIO_BUFFER_INDEX = 11;
 // Listener
 ALfloat listenerPos[] = { 0.0, 0.0, 4.0 };
 ALfloat listenerVel[] = { 0.0, 0.0, 0.0 };
@@ -340,7 +349,8 @@ int ch;
 ALboolean loop;
 std::vector<bool> sourcesPlay = {
 	true, false, false, false, false, false,
-	false, false, false, false, false, false, false, false
+	false, false, false, false, false, false, false, false, false,
+	false, false, false, false, false
 };
 
 // Framesbuffers
@@ -1283,8 +1293,20 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	buffer[3] = alutCreateBufferFromFile("../sounds/MonedaMono.wav");
 	buffer[4] = alutCreateBufferFromFile("../sounds/Hurt.wav");
 	buffer[5] = alutCreateBufferFromFile("../sounds/Puerta.wav");
+	buffer[MUSIC_MENU_BUFFER_INDEX] =
+		alutCreateBufferFromFile("../sounds/3_09_HokmaStory.wav");
+	buffer[MUSIC_BATTLE_1_BUFFER_INDEX] =
+		alutCreateBufferFromFile("../sounds/3_09_HokmaBattle01.wav");
+	buffer[MUSIC_BATTLE_2_BUFFER_INDEX] =
+		alutCreateBufferFromFile("../sounds/3_09_HokmaBattle02.wav");
+	buffer[MUSIC_BATTLE_3_BUFFER_INDEX] =
+		alutCreateBufferFromFile("../sounds/3_09_HokmaBattle03.wav");
+	buffer[MUSIC_GAME_OVER_BUFFER_INDEX] =
+		alutCreateBufferFromFile("../sounds/4_1_StoryChaboon.wav");
+	buffer[ENEMY_AUDIO_BUFFER_INDEX] =
+		alutCreateBufferFromFile("../sounds/ZombieMono.wav");
 	// Audio de Darth reservado:
-	// buffer[6] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
+	// buffer[12] = alutCreateBufferFromFile("../sounds/darth_vader.wav");
 	int errorAlut = alutGetError();
 	if (errorAlut != ALUT_ERROR_NO_ERROR){
 		printf("- Error open files with alut %d !!\n", errorAlut);
@@ -1339,14 +1361,14 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	for (int i = 0; i < monedasActivas.size(); i++) {
 		const int sourceIndex = COIN_AUDIO_SOURCE_START + i;
 		alSourcef(source[sourceIndex], AL_PITCH, 1.0f);
-		alSourcef(source[sourceIndex], AL_GAIN, 0.50f);
+		alSourcef(source[sourceIndex], AL_GAIN, 0.75f);
 		alSourcei(source[sourceIndex], AL_BUFFER, buffer[2]);
 		alSourcei(source[sourceIndex], AL_LOOPING, AL_TRUE);
 		alSourcei(
 			source[sourceIndex], AL_SOURCE_RELATIVE, AL_FALSE);
 		alSourcef(source[sourceIndex], AL_REFERENCE_DISTANCE, 2.0f);
 		alSourcef(source[sourceIndex], AL_ROLLOFF_FACTOR, 1.0f);
-		alSourcef(source[sourceIndex], AL_MAX_DISTANCE, 40.0f);
+		alSourcef(source[sourceIndex], AL_MAX_DISTANCE, 65.0f);
 	}
 
 	alSourcef(source[COIN_PICKUP_SOURCE_INDEX], AL_PITCH, 1.0f);
@@ -1386,6 +1408,36 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		source[DOOR_OPEN_SOURCE_INDEX], AL_POSITION,
 		0.0f, 0.0f, 0.0f);
 
+	alSourcef(source[BACKGROUND_MUSIC_SOURCE_INDEX], AL_PITCH, 1.0f);
+	alSourcef(source[BACKGROUND_MUSIC_SOURCE_INDEX], AL_GAIN, 0.25f);
+	alSourcei(
+		source[BACKGROUND_MUSIC_SOURCE_INDEX],
+		AL_BUFFER, buffer[MUSIC_MENU_BUFFER_INDEX]);
+	alSourcei(
+		source[BACKGROUND_MUSIC_SOURCE_INDEX], AL_LOOPING, AL_TRUE);
+	alSourcei(
+		source[BACKGROUND_MUSIC_SOURCE_INDEX],
+		AL_SOURCE_RELATIVE, AL_TRUE);
+	alSource3f(
+		source[BACKGROUND_MUSIC_SOURCE_INDEX], AL_POSITION,
+		0.0f, 0.0f, 0.0f);
+	alSourcePlay(source[BACKGROUND_MUSIC_SOURCE_INDEX]);
+
+	for (int i = 0; i < 5; i++) {
+		const int sourceIndex = ENEMY_AUDIO_SOURCE_START + i;
+		alSourcef(source[sourceIndex], AL_PITCH, 1.0f);
+		alSourcef(source[sourceIndex], AL_GAIN, 0.65f);
+		alSourcei(
+			source[sourceIndex], AL_BUFFER,
+			buffer[ENEMY_AUDIO_BUFFER_INDEX]);
+		alSourcei(source[sourceIndex], AL_LOOPING, AL_TRUE);
+		alSourcei(
+			source[sourceIndex], AL_SOURCE_RELATIVE, AL_FALSE);
+		alSourcef(source[sourceIndex], AL_REFERENCE_DISTANCE, 3.0f);
+		alSourcef(source[sourceIndex], AL_ROLLOFF_FACTOR, 1.0f);
+		alSourcef(source[sourceIndex], AL_MAX_DISTANCE, 20.0f);
+	}
+
 	/*
 	 * Configuracion de audio de Darth reservada:
 	 * alSourcef(source[DARTH_AUDIO_SOURCE_INDEX], AL_PITCH, 1.0f);
@@ -1395,7 +1447,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	 * alSourcefv(
 	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_VELOCITY, darthSourceVel);
 	 * alSourcei(
-	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_BUFFER, buffer[6]);
+	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_BUFFER, buffer[12]);
 	 * alSourcei(source[DARTH_AUDIO_SOURCE_INDEX], AL_LOOPING, AL_TRUE);
 	 * alSourcef(
 	 *     source[DARTH_AUDIO_SOURCE_INDEX], AL_MAX_DISTANCE, 2000);
@@ -1589,8 +1641,14 @@ bool processInput(bool continueApplication) {
 			if (textureActivaID == textureInit1ID) {
 				iniciaPartida = true;
 				textureActivaID = textureScreenID;
+				alSourceStop(source[BACKGROUND_MUSIC_SOURCE_INDEX]);
+				alSourcei(
+					source[BACKGROUND_MUSIC_SOURCE_INDEX], AL_BUFFER,
+					buffer[MUSIC_BATTLE_1_BUFFER_INDEX]);
+				alSourcePlay(source[BACKGROUND_MUSIC_SOURCE_INDEX]);
 			}
 			else if (textureActivaID == textureInit2ID) {
+				alSourceStop(source[BACKGROUND_MUSIC_SOURCE_INDEX]);
 				exitApp = true;
 				return false;
 			}
@@ -1934,11 +1992,16 @@ void renderSolidScene(){
 	modelMatrixEnemy5[3][1] = terrain.getHeightTerrain(
 		modelMatrixEnemy5[3][0], modelMatrixEnemy5[3][2]);
 
-	modelEnemy1.render(glm::scale(modelMatrixEnemy1, glm::vec3(0.01f)));
-	modelEnemy2.render(glm::scale(modelMatrixEnemy2, glm::vec3(0.01f)));
-	modelEnemy3.render(glm::scale(modelMatrixEnemy3, glm::vec3(0.01f)));
-	modelEnemy4.render(glm::scale(modelMatrixEnemy4, glm::vec3(0.01f)));
-	modelEnemy5.render(glm::scale(modelMatrixEnemy5, glm::vec3(0.01f)));
+	modelEnemy1.render(glm::scale(
+		modelMatrixEnemy1, glm::vec3(ENEMY_MODEL_SCALE)));
+	modelEnemy2.render(glm::scale(
+		modelMatrixEnemy2, glm::vec3(ENEMY_MODEL_SCALE)));
+	modelEnemy3.render(glm::scale(
+		modelMatrixEnemy3, glm::vec3(ENEMY_MODEL_SCALE)));
+	modelEnemy4.render(glm::scale(
+		modelMatrixEnemy4, glm::vec3(ENEMY_MODEL_SCALE)));
+	modelEnemy5.render(glm::scale(
+		modelMatrixEnemy5, glm::vec3(ENEMY_MODEL_SCALE)));
 
 	// Fountain
 	glDisable(GL_CULL_FACE);
@@ -2314,6 +2377,11 @@ void applicationLoop() {
 					>= DURACION_ANIMACION_MUERTE) {
 				animacionMuerteActiva = false;
 				pantallaGameOverActiva = true;
+				alSourceStop(source[BACKGROUND_MUSIC_SOURCE_INDEX]);
+				alSourcei(
+					source[BACKGROUND_MUSIC_SOURCE_INDEX], AL_BUFFER,
+					buffer[MUSIC_GAME_OVER_BUFFER_INDEX]);
+				alSourcePlay(source[BACKGROUND_MUSIC_SOURCE_INDEX]);
 			}
 		}
 
@@ -2741,15 +2809,15 @@ void applicationLoop() {
 
 		collidersEnemigosOBB.clear();
 		collidersEnemigosOBB["Enemy-1"] = createModelOBB(
-			modelEnemy1, modelMatrixEnemy1, 0.01f);
+			modelEnemy1, modelMatrixEnemy1, ENEMY_MODEL_SCALE);
 		collidersEnemigosOBB["Enemy-2"] = createModelOBB(
-			modelEnemy2, modelMatrixEnemy2, 0.01f);
+			modelEnemy2, modelMatrixEnemy2, ENEMY_MODEL_SCALE);
 		collidersEnemigosOBB["Enemy-3"] = createModelOBB(
-			modelEnemy3, modelMatrixEnemy3, 0.01f);
+			modelEnemy3, modelMatrixEnemy3, ENEMY_MODEL_SCALE);
 		collidersEnemigosOBB["Enemy-4"] = createModelOBB(
-			modelEnemy4, modelMatrixEnemy4, 0.01f);
+			modelEnemy4, modelMatrixEnemy4, ENEMY_MODEL_SCALE);
 		collidersEnemigosOBB["Enemy-5"] = createModelOBB(
-			modelEnemy5, modelMatrixEnemy5, 0.01f);
+			modelEnemy5, modelMatrixEnemy5, ENEMY_MODEL_SCALE);
 
 		// Colliders AABB de monedas. La etiqueta "Moneda-" permite
 		// distinguir objetos recolectables de los obstaculos del escenario.
@@ -2985,6 +3053,19 @@ void applicationLoop() {
 						&& monedasActivas[monedaIndex]) {
 					monedasActivas[monedaIndex] = false;
 					contadorMonedas++;
+					if (contadorMonedas == 2 || contadorMonedas == 4) {
+						const int musicBufferIndex =
+							contadorMonedas == 2
+								? MUSIC_BATTLE_2_BUFFER_INDEX
+								: MUSIC_BATTLE_3_BUFFER_INDEX;
+						alSourceStop(
+							source[BACKGROUND_MUSIC_SOURCE_INDEX]);
+						alSourcei(
+							source[BACKGROUND_MUSIC_SOURCE_INDEX],
+							AL_BUFFER, buffer[musicBufferIndex]);
+						alSourcePlay(
+							source[BACKGROUND_MUSIC_SOURCE_INDEX]);
+					}
 					const int coinSourceIndex =
 						COIN_AUDIO_SOURCE_START + monedaIndex;
 					alSourceStop(source[coinSourceIndex]);
@@ -3203,7 +3284,7 @@ void applicationLoop() {
 			const bool playerInCoinAudioRange =
 				glm::distance(
 					playerAudioPosition, monedaAudioPositions[i])
-					<= 20.0f;
+					<= 65.0f;
 			ALint sourceState;
 			alGetSourcei(source[sourceIndex], AL_SOURCE_STATE, &sourceState);
 
@@ -3211,6 +3292,30 @@ void applicationLoop() {
 					&& sourceState != AL_PLAYING)
 				alSourcePlay(source[sourceIndex]);
 			else if ((!monedasActivas[i] || !playerInCoinAudioRange)
+					&& sourceState == AL_PLAYING)
+				alSourcePause(source[sourceIndex]);
+		}
+
+		glm::mat4 *enemyAudioMatrices[] = {
+			&modelMatrixEnemy1, &modelMatrixEnemy2, &modelMatrixEnemy3,
+			&modelMatrixEnemy4, &modelMatrixEnemy5
+		};
+		for (int i = 0; i < 5; i++) {
+			const int sourceIndex = ENEMY_AUDIO_SOURCE_START + i;
+			const glm::vec3 enemyAudioPosition =
+				glm::vec3((*enemyAudioMatrices[i])[3]);
+			alSourcefv(
+				source[sourceIndex], AL_POSITION,
+				glm::value_ptr(enemyAudioPosition));
+			const bool playerInEnemyAudioRange =
+				glm::distance(
+					playerAudioPosition, enemyAudioPosition) <= 20.0f;
+			ALint sourceState;
+			alGetSourcei(source[sourceIndex], AL_SOURCE_STATE, &sourceState);
+
+			if (playerInEnemyAudioRange && sourceState != AL_PLAYING)
+				alSourcePlay(source[sourceIndex]);
+			else if (!playerInEnemyAudioRange
 					&& sourceState == AL_PLAYING)
 				alSourcePause(source[sourceIndex]);
 		}
