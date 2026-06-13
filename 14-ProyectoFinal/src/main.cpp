@@ -122,6 +122,7 @@ GLuint textureParticleFireID;
 bool iniciaPartida = false;
 bool presionarOpcion = false;
 bool presionarSeleccionMenu = false;
+bool pantallaFinalListaParaCerrar = false;
 
 FontTypeRendering::FontTypeRendering *modelText;
 
@@ -755,7 +756,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	}
 
 	// Texturas del escenario
-	Texture textureCesped("../Textures/grassy2.png");
+	Texture textureCesped("../Textures/SueloDark.jpg");
 	textureCesped.loadImage();
 	glGenTextures(1, &textureCespedID);
 	glBindTexture(GL_TEXTURE_2D, textureCespedID);
@@ -838,7 +839,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 
 	// Defininiendo texturas del mapa de mezclas
 	// Definiendo la textura
-	Texture textureR("../Textures/mud.png");
+	Texture textureR("../Textures/Sangre.jpg");
 	textureR.loadImage(); // Cargar la textura
 	glGenTextures(1, &textureTerrainRID); // Creando el id de la textura del landingpad
 	glBindTexture(GL_TEXTURE_2D, textureTerrainRID); // Se enlaza la textura
@@ -857,7 +858,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	textureR.freeImage(); // Liberamos memoria
 
 	// Definiendo la textura
-	Texture textureG("../Textures/grassFlowers.png");
+	Texture textureG("../Textures/Camino.jpg");
 	textureG.loadImage(); // Cargar la textura
 	glGenTextures(1, &textureTerrainGID); // Creando el id de la textura del landingpad
 	glBindTexture(GL_TEXTURE_2D, textureTerrainGID); // Se enlaza la textura
@@ -876,7 +877,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	textureG.freeImage(); // Liberamos memoria
 
 	// Definiendo la textura
-	Texture textureB("../Textures/path.png");
+	Texture textureB("../Textures/Ceniza.jpg");
 	textureB.loadImage(); // Cargar la textura
 	glGenTextures(1, &textureTerrainBID); // Creando el id de la textura del landingpad
 	glBindTexture(GL_TEXTURE_2D, textureTerrainBID); // Se enlaza la textura
@@ -895,7 +896,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	textureB.freeImage(); // Liberamos memoria
 
 	// Definiendo la textura
-	Texture textureBlendMap("../Textures/blendMap.png");
+	Texture textureBlendMap("../Textures/NewBlendMap.png");
 	textureBlendMap.loadImage(); // Cargar la textura
 	glGenTextures(1, &textureTerrainBlendMapID); // Creando el id de la textura del landingpad
 	glBindTexture(GL_TEXTURE_2D, textureTerrainBlendMapID); // Se enlaza la textura
@@ -1464,6 +1465,14 @@ bool processInput(bool continueApplication) {
 			|| (gamepadConnected
 				&& gamepadState.buttons[GLFW_GAMEPAD_BUTTON_START]
 					== GLFW_PRESS);
+
+		if (!pantallaFinalListaParaCerrar) {
+			if (!cerrarPantallaFinal)
+				pantallaFinalListaParaCerrar = true;
+			glfwPollEvents();
+			return continueApplication;
+		}
+
 		if (cerrarPantallaFinal) {
 			exitApp = true;
 			return false;
