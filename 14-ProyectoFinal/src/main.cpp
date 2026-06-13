@@ -73,8 +73,6 @@ Shader shaderTexture;
 Shader shaderDepth;
 // Shader para visualizar el buffer de profundidad
 Shader shaderViewDepth;
-//Shader para las particulas de fountain
-Shader shaderParticlesFountain;
 //Shader para las particulas de fuego
 Shader shaderParticlesFire;
 
@@ -134,8 +132,6 @@ Model modelEnemy5;
 // Modelos animados
 // Player (replaces Mayow)
 Model playerModelAnimate;
-// Fountain
-Model modelFountain;
 // Antorcha
 Model modelAntocha;
 // Terrain model instance
@@ -150,7 +146,6 @@ GLuint textureInit1ID, textureInit2ID, textureActivaID;
 GLuint textureGameOverID, textureVictoriaID;
 GLuint textureScreenID, textureScreen1LifeID, textureScreen0LivesID;
 GLuint textureHeartID;
-GLuint textureParticleFountainID;
 GLuint textureParticleFireID;
 
 bool iniciaPartida = false;
@@ -181,7 +176,6 @@ int lastMousePosY, offsetY = 0;
 
 // Model matrix definitions
 glm::mat4 modelMatrixPlayer = glm::mat4(1.0f);
-glm::mat4 modelMatrixFountain = glm::mat4(1.0f);
 glm::mat4 modelMatrixEntrada = glm::mat4(1.0f);
 glm::mat4 modelMatrixSalida = glm::mat4(1.0f);
 glm::mat4 modelMatrixPuertaDer = glm::mat4(1.0f);
@@ -281,7 +275,6 @@ const float GAMEPAD_CAMERA_SPEED = 3.0f;
 
 // Blending model unsorted
 std::map<std::string, glm::vec3> blendingUnsorted = {
-		{"fountain", glm::vec3(0.0)},
 		{"fire0", antochaPositions[0]},
 		{"fire1", antochaPositions[1]},
 		{"fire2", antochaPositions[2]},
@@ -308,30 +301,27 @@ std::map<std::string, AbstractModel::AABB> collidersMurosAABB;
 std::map<std::string, AbstractModel::OBB> collidersEnemigosOBB;
 
 // OpenAL Defines
-#define NUM_BUFFERS 13
-#define NUM_SOURCES 21
+#define NUM_BUFFERS 12
+#define NUM_SOURCES 20
 #define NUM_ENVIRONMENTS 1
-const int TORCH_AUDIO_SOURCE_START = 1;
-const int COIN_AUDIO_SOURCE_START = 6;
-const int COIN_PICKUP_SOURCE_INDEX = 11;
-const int PLAYER_HURT_SOURCE_INDEX = 12;
-const int DOOR_OPEN_SOURCE_INDEX = 13;
-const int BACKGROUND_MUSIC_SOURCE_INDEX = 14;
-const int ENEMY_AUDIO_SOURCE_START = 15;
-const int DARTH_AUDIO_SOURCE_INDEX = 20;
-const int MUSIC_MENU_BUFFER_INDEX = 6;
-const int MUSIC_BATTLE_1_BUFFER_INDEX = 7;
-const int MUSIC_BATTLE_2_BUFFER_INDEX = 8;
-const int MUSIC_BATTLE_3_BUFFER_INDEX = 9;
-const int MUSIC_GAME_OVER_BUFFER_INDEX = 10;
-const int ENEMY_AUDIO_BUFFER_INDEX = 11;
+const int TORCH_AUDIO_SOURCE_START = 0;
+const int COIN_AUDIO_SOURCE_START = 5;
+const int COIN_PICKUP_SOURCE_INDEX = 10;
+const int PLAYER_HURT_SOURCE_INDEX = 11;
+const int DOOR_OPEN_SOURCE_INDEX = 12;
+const int BACKGROUND_MUSIC_SOURCE_INDEX = 13;
+const int ENEMY_AUDIO_SOURCE_START = 14;
+const int DARTH_AUDIO_SOURCE_INDEX = 19;
+const int MUSIC_MENU_BUFFER_INDEX = 5;
+const int MUSIC_BATTLE_1_BUFFER_INDEX = 6;
+const int MUSIC_BATTLE_2_BUFFER_INDEX = 7;
+const int MUSIC_BATTLE_3_BUFFER_INDEX = 8;
+const int MUSIC_GAME_OVER_BUFFER_INDEX = 9;
+const int ENEMY_AUDIO_BUFFER_INDEX = 10;
 // Listener
 ALfloat listenerPos[] = { 0.0, 0.0, 4.0 };
 ALfloat listenerVel[] = { 0.0, 0.0, 0.0 };
 ALfloat listenerOri[] = { 0.0, 0.0, 1.0, 0.0, 1.0, 0.0 };
-// Source 0
-ALfloat source0Pos[] = { -2.0, 0.0, 0.0 };
-ALfloat source0Vel[] = { 0.0, 0.0, 0.0 };
 /*
  * Audio de Darth reservado para una futura integracion con OpenAL.
  * ALfloat darthSourcePos[] = { 2.0, 0.0, 0.0 };
@@ -347,20 +337,8 @@ ALenum format;
 ALvoid *data;
 int ch;
 ALboolean loop;
-std::vector<bool> sourcesPlay = {
-	true, false, false, false, false, false,
-	false, false, false, false, false, false, false, false, false,
-	false, false, false, false, false
-};
-
 // Framesbuffers
 GLuint depthMap, depthMapFBO;
-// variables  para  el sistema de particulas de la fuente
-GLuint initVel, startTime;
-GLuint VAOParticles;
-GLuint nParticles = 200;
-double currentTimeParticles, lastTimeParticles;
-
 // Variables para partículas de fuego, estilo fuente
 GLuint fireInitVel;
 GLuint fireStartTime;
@@ -381,7 +359,6 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action,
 void mouseCallback(GLFWwindow *window, double xpos, double ypos);
 void mouseButtonCallback(GLFWwindow *window, int button, int state, int mod);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
-void initParticleBuffers();
 void initFireParticleBuffers();
 void init(int width, int height, std::string strTitle, bool bFullScreen);
 void destroy();
@@ -520,69 +497,6 @@ void updateEnemyPatrol(
 		glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-void initParticleBuffers(){
-	//Generar los buffers
-	glGenBuffers(1, &initVel);
-	glGenBuffers(1, &startTime);
-
-	//reserva de memoria para los buffers
-	int sizeInitVel = nParticles * 3 * sizeof(GLfloat);
-	int sizeStartTime = nParticles * sizeof(GLfloat);
-	glBindBuffer(GL_ARRAY_BUFFER, initVel);
-	glBufferData(GL_ARRAY_BUFFER, sizeInitVel, NULL, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, startTime);
-	glBufferData(GL_ARRAY_BUFFER, sizeStartTime, NULL, GL_STATIC_DRAW);
-
-	// Generar la velocidad inicial con velocidades aleatorias
-	glm::vec3 v(0.0f);
-	float velocity, theta, phi;
-	GLfloat *data = new GLfloat[nParticles * 3];
-	for(unsigned int i = 0; i < nParticles; i++){
-		theta = glm::mix(0.0f, glm::pi<float>() / 6.0f, ((float) rand() / RAND_MAX));
-		phi = glm::mix(0.0f, glm::two_pi<float>(), ((float) rand() / RAND_MAX));
-
-		v.x = sinf(theta) * cosf(phi);
-		v.y = cosf(theta);
-		v.z = sinf(theta) * sinf(phi);
-
-		velocity = glm::mix(0.6f, 0.8f, ((float) rand() / RAND_MAX));
-		v = glm::normalize(v) * velocity;
-
-		data[3 * i] = v.x;
-		data[3 * i + 1] = v.y;
-		data[3 * i + 2] = v.z;
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, initVel);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeInitVel, data);
-	delete[] data;
-
-	// Tiempo inicial de la particula (Cuando nace)
-	data = new GLfloat[nParticles];
-	float time = 0.0f;
-	float rate = 0.00075f;
-	for (unsigned int i = 0; i < nParticles; i++) {
-		data[i] = time;
-		time += rate;
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, startTime);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeStartTime, data);
-	delete[] data;
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glGenVertexArrays(1, &VAOParticles);
-	glBindVertexArray(VAOParticles);
-	glBindBuffer(GL_ARRAY_BUFFER, initVel);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, startTime);
-	glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, NULL);
-	glEnableVertexAttribArray(1);
-
-	glBindVertexArray(0);
-
-}
-
 void initFireParticleBuffers() {
     glGenBuffers(1, &fireInitVel);
     glGenBuffers(1, &fireStartTime);
@@ -719,7 +633,6 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	shaderTexture.initialize("../Shaders/texturizado.vs", "../Shaders/texturizado.fs");
 	shaderViewDepth.initialize("../Shaders/texturizado.vs", "../Shaders/texturizado_depth_view.fs");
 	shaderDepth.initialize("../Shaders/shadow_mapping_depth.vs", "../Shaders/shadow_mapping_depth.fs");
-	shaderParticlesFountain.initialize("../Shaders/particlesFountain.vs", "../Shaders/particlesFountain.fs");
 	shaderParticlesFire.initialize("../Shaders/particlesFire.vs", "../Shaders/particlesFire.fs");
 
 	// Inicializacion de los objetos.
@@ -815,10 +728,6 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	playerModelAnimate.loadModel("../models/Player/Player.fbx");
 	playerModelAnimate.setShader(&shaderMulLighting);
 	
-	//Fountain
-	modelFountain.loadModel("../models/fountain/fountain.obj");
-	modelFountain.setShader(&shaderMulLighting);
-
 	// Antorcha
 	modelAntocha.loadModel("../models/Antocha/AntochaZero.obj");
 	modelAntocha.setShader(&shaderMulLighting);
@@ -1230,25 +1139,6 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	}
 	textureHeart.freeImage();
 
-	// Definiendo la textura
-	Texture textureParticlesFountain("../Textures/bluewater.png");
-	textureParticlesFountain.loadImage(); // Cargar la textura
-	glGenTextures(1, &textureParticleFountainID); // Creando el id de la textura del landingpad
-	glBindTexture(GL_TEXTURE_2D, textureParticleFountainID); // Se enlaza la textura
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // Wrapping en el eje u
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // Wrapping en el eje v
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Filtering de minimización
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Filtering de maximimizacion
-	if(textureParticlesFountain.getData()){
-		// Transferir los datos de la imagen a la tarjeta
-		glTexImage2D(GL_TEXTURE_2D, 0, textureParticlesFountain.getChannels() == 3 ? GL_RGB : GL_RGBA, textureParticlesFountain.getWidth(), textureParticlesFountain.getHeight(), 0,
-		textureParticlesFountain.getChannels() == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, textureParticlesFountain.getData());
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else 
-		std::cout << "Fallo la carga de textura" << std::endl;
-	textureParticlesFountain.freeImage(); // Liberamos memoria
-
 	// Definiendo la textura de fuego
 	Texture textureParticlesFire("../Textures/fire.png"); 
 	textureParticlesFire.loadImage();
@@ -1287,12 +1177,11 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	}
 	// Generate buffers, or else no sound will happen!
 	alGenBuffers(NUM_BUFFERS, buffer);
-	buffer[0] = alutCreateBufferFromFile("../sounds/fountain.wav");
-	buffer[1] = alutCreateBufferFromFile("../sounds/FuegoMono.wav");
-	buffer[2] = alutCreateBufferFromFile("../sounds/BrillanteMono.wav");
-	buffer[3] = alutCreateBufferFromFile("../sounds/MonedaMono.wav");
-	buffer[4] = alutCreateBufferFromFile("../sounds/Hurt.wav");
-	buffer[5] = alutCreateBufferFromFile("../sounds/Puerta.wav");
+	buffer[0] = alutCreateBufferFromFile("../sounds/FuegoMono.wav");
+	buffer[1] = alutCreateBufferFromFile("../sounds/BrillanteMono.wav");
+	buffer[2] = alutCreateBufferFromFile("../sounds/MonedaMono.wav");
+	buffer[3] = alutCreateBufferFromFile("../sounds/Hurt.wav");
+	buffer[4] = alutCreateBufferFromFile("../sounds/Puerta.wav");
 	buffer[MUSIC_MENU_BUFFER_INDEX] =
 		alutCreateBufferFromFile("../sounds/3_09_HokmaStory.wav");
 	buffer[MUSIC_BATTLE_1_BUFFER_INDEX] =
@@ -1323,17 +1212,6 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	else {
 		printf("init - no errors after alGenSources\n");
 	}
-	alSourcef(source[0], AL_PITCH, 1.0f);
-	alSourcef(source[0], AL_GAIN, 3.0f);
-	alSourcefv(source[0], AL_POSITION, source0Pos);
-	alSourcefv(source[0], AL_VELOCITY, source0Vel);
-	alSourcei(source[0], AL_BUFFER, buffer[0]);
-	alSourcei(source[0], AL_LOOPING, AL_TRUE);
-	alSourcei(source[0], AL_SOURCE_RELATIVE, AL_FALSE);
-	alSourcef(source[0], AL_REFERENCE_DISTANCE, 5.0f);
-	alSourcef(source[0], AL_ROLLOFF_FACTOR, 1.0f);
-	alSourcef(source[0], AL_MAX_DISTANCE, 25.0f);
-
 	for (int i = 0; i < antochaPositions.size(); i++) {
 		const int sourceIndex = TORCH_AUDIO_SOURCE_START + i;
 		ALfloat torchAudioPosition[] = {
@@ -1349,7 +1227,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 			source[sourceIndex], AL_POSITION, torchAudioPosition);
 		alSourcefv(
 			source[sourceIndex], AL_VELOCITY, torchAudioVelocity);
-		alSourcei(source[sourceIndex], AL_BUFFER, buffer[1]);
+		alSourcei(source[sourceIndex], AL_BUFFER, buffer[0]);
 		alSourcei(source[sourceIndex], AL_LOOPING, AL_TRUE);
 		alSourcei(
 			source[sourceIndex], AL_SOURCE_RELATIVE, AL_FALSE);
@@ -1362,7 +1240,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 		const int sourceIndex = COIN_AUDIO_SOURCE_START + i;
 		alSourcef(source[sourceIndex], AL_PITCH, 1.0f);
 		alSourcef(source[sourceIndex], AL_GAIN, 0.75f);
-		alSourcei(source[sourceIndex], AL_BUFFER, buffer[2]);
+		alSourcei(source[sourceIndex], AL_BUFFER, buffer[1]);
 		alSourcei(source[sourceIndex], AL_LOOPING, AL_TRUE);
 		alSourcei(
 			source[sourceIndex], AL_SOURCE_RELATIVE, AL_FALSE);
@@ -1374,7 +1252,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	alSourcef(source[COIN_PICKUP_SOURCE_INDEX], AL_PITCH, 1.0f);
 	alSourcef(source[COIN_PICKUP_SOURCE_INDEX], AL_GAIN, 0.65f);
 	alSourcei(
-		source[COIN_PICKUP_SOURCE_INDEX], AL_BUFFER, buffer[3]);
+		source[COIN_PICKUP_SOURCE_INDEX], AL_BUFFER, buffer[2]);
 	alSourcei(source[COIN_PICKUP_SOURCE_INDEX], AL_LOOPING, AL_FALSE);
 	alSourcei(
 		source[COIN_PICKUP_SOURCE_INDEX], AL_SOURCE_RELATIVE, AL_FALSE);
@@ -1388,7 +1266,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	alSourcef(source[PLAYER_HURT_SOURCE_INDEX], AL_PITCH, 1.0f);
 	alSourcef(source[PLAYER_HURT_SOURCE_INDEX], AL_GAIN, 0.75f);
 	alSourcei(
-		source[PLAYER_HURT_SOURCE_INDEX], AL_BUFFER, buffer[4]);
+		source[PLAYER_HURT_SOURCE_INDEX], AL_BUFFER, buffer[3]);
 	alSourcei(
 		source[PLAYER_HURT_SOURCE_INDEX], AL_LOOPING, AL_FALSE);
 	alSourcei(
@@ -1400,7 +1278,7 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	alSourcef(source[DOOR_OPEN_SOURCE_INDEX], AL_PITCH, 1.0f);
 	alSourcef(source[DOOR_OPEN_SOURCE_INDEX], AL_GAIN, 0.80f);
 	alSourcei(
-		source[DOOR_OPEN_SOURCE_INDEX], AL_BUFFER, buffer[5]);
+		source[DOOR_OPEN_SOURCE_INDEX], AL_BUFFER, buffer[4]);
 	alSourcei(source[DOOR_OPEN_SOURCE_INDEX], AL_LOOPING, AL_FALSE);
 	alSourcei(
 		source[DOOR_OPEN_SOURCE_INDEX], AL_SOURCE_RELATIVE, AL_TRUE);
@@ -1474,8 +1352,6 @@ void init(int width, int height, std::string strTitle, bool bFullScreen) {
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	//inicializacion de los datos de la particula de agua
-	initParticleBuffers();
 	//inicializacion de los datos de la particula de fuego
 	initFireParticleBuffers();
 	lastTimeFire = TimeManager::Instance().GetTime();
@@ -1492,7 +1368,6 @@ void destroy() {
 	shaderMulLighting.destroy();
 	shaderSkybox.destroy();
 	shaderTerrain.destroy();
-	shaderParticlesFountain.destroy();
 	shaderParticlesFire.destroy();
 
 	// Basic objects Delete
@@ -1523,8 +1398,6 @@ void destroy() {
 	modelEnemy5.destroy();
 	modelAntocha.destroy();
 	playerModelAnimate.destroy();
-	modelFountain.destroy();
-
 	// Terrains objects Delete
 	terrain.destroy();
 
@@ -1547,19 +1420,12 @@ void destroy() {
 	glDeleteTextures(1, &textureScreen1LifeID);
 	glDeleteTextures(1, &textureScreen0LivesID);
 	glDeleteTextures(1, &textureHeartID);
-	glDeleteTextures(1, &textureParticleFountainID);
 	glDeleteTextures(1, &textureParticleFireID);
 
 	// Cube Maps Delete
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	glDeleteTextures(1, &skyboxTextureID);
 
-	// Liberar los datos del buffer de las particulas de la fuente de agua
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glDeleteBuffers(1, &initVel);
-	glDeleteBuffers(1, &startTime);
-	glBindVertexArray(0);
-	glDeleteVertexArrays(1, &VAOParticles);
 	// Liberar los datos del buffer de las particulas de fuego
 	glDeleteBuffers(1, &fireInitVel);
 	glDeleteBuffers(1, &fireStartTime);
@@ -1867,9 +1733,6 @@ void prepareScene(){
 	//Player
 	playerModelAnimate.setShader(&shaderMulLighting);
 
-	// Fountain
-	modelFountain.setShader(&shaderMulLighting);
-
 	// Monedas del laberinto
 	modelMoneda1.setShader(&shaderMulLighting);
 	modelMoneda2.setShader(&shaderMulLighting);
@@ -1896,9 +1759,6 @@ void prepareDepthScene(){
 
 	//Player
 	playerModelAnimate.setShader(&shaderDepth);
-
-	// Fountain
-	modelFountain.setShader(&shaderDepth);
 
 	// Monedas del laberinto
 	modelMoneda1.setShader(&shaderDepth);
@@ -2003,13 +1863,6 @@ void renderSolidScene(){
 	modelEnemy5.render(glm::scale(
 		modelMatrixEnemy5, glm::vec3(ENEMY_MODEL_SCALE)));
 
-	// Fountain
-	glDisable(GL_CULL_FACE);
-	modelMatrixFountain[3][1] = terrain.getHeightTerrain(modelMatrixFountain[3][0] , modelMatrixFountain[3][2]) + 0.2;
-	glm::mat4 modelMatrixFountainCopy = glm::scale(modelMatrixFountain, glm::vec3(10.0f, 10.0f, 10.0f));
-	modelFountain.render(modelMatrixFountainCopy);
-	glEnable(GL_CULL_FACE);
-
 	// Antochas
 	for (int i = 0; i < antochaPositions.size(); i++) {
 		glm::mat4 modelMatrixAntocha = glm::translate(
@@ -2072,9 +1925,6 @@ void renderAlphaScene(bool render = true){
 	/**********
 	 * Update the position with alpha objects
 	 */
-	// update the fountain
-	blendingUnsorted.find("fountain")->second = glm::vec3(modelMatrixFountain[3]);
-
 	/**********
 	 * Sorter with alpha objects
 	 */
@@ -2093,31 +1943,7 @@ void renderAlphaScene(bool render = true){
 	glDisable(GL_CULL_FACE);
 	
 	for(std::map<float, std::pair<std::string, glm::vec3> >::reverse_iterator it = blendingSorted.rbegin(); it != blendingSorted.rend(); it++){
-		if(render && it->second.first.compare("fountain") == 0){
-			// Se renderiza el sistema de partículas de la fuente
-			glm::mat4 modelMatrixParticlesFountain = glm::mat4(1.0);
-			modelMatrixParticlesFountain = glm::translate(modelMatrixParticlesFountain, it->second.second);
-			modelMatrixParticlesFountain[3][1] = terrain.getHeightTerrain(modelMatrixParticlesFountain[3][0], modelMatrixParticlesFountain[3][2]) + 4.2f;
-			modelMatrixParticlesFountain = glm::scale(modelMatrixParticlesFountain, glm::vec3(3.0f));
-			currentTimeParticles = TimeManager::Instance().GetTime();
-			if(currentTimeParticles - lastTimeParticles > 10.0f){
-				lastTimeParticles = currentTimeParticles;}
-			glDepthMask(GL_FALSE);
-			glPointSize(10.0f);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, textureParticleFountainID);
-			shaderParticlesFountain.turnOn();
-			shaderParticlesFountain.setFloat("Time", float(currentTimeParticles - lastTimeParticles));
-			shaderParticlesFountain.setFloat("ParticleLifetime", 10.0f);
-			shaderParticlesFountain.setInt("ParticleTex", 0);
-			shaderParticlesFountain.setVectorFloat3("Gravity", glm::value_ptr(glm::vec3(0.0f, -0.01f, 0.0f)));
-			shaderParticlesFountain.setMatrix4("model", 1, false, glm::value_ptr(modelMatrixParticlesFountain));
-			glBindVertexArray(VAOParticles);
-			glDrawArrays(GL_POINTS, 0, nParticles);
-			glDepthMask(GL_TRUE);
-			shaderParticlesFountain.turnOff();
-		}
-		else if (render
+		if (render
 				&& it->second.first.compare(0, 4, "fire") == 0) {
 			const AbstractModel::AABB &torchAABB = modelAntocha.getAAbb();
 			glm::vec3 firePosition(
@@ -2231,8 +2057,6 @@ void applicationLoop() {
 	baseMatrixEnemy3 = modelMatrixEnemy3;
 	baseMatrixEnemy4 = modelMatrixEnemy4;
 	baseMatrixEnemy5 = modelMatrixEnemy5;
-
-	modelMatrixFountain = glm::translate(modelMatrixFountain, glm::vec3(5.0, 0.0, -40.0));
 
 	// Muros del laberinto
 	modelMatrixMuro1 = glm::mat4(1.0f);
@@ -2504,11 +2328,6 @@ void applicationLoop() {
 				glm::value_ptr(view));
 		shaderTerrain.setMatrix4("lightSpaceMatrix", 1, false,
 				glm::value_ptr(lightSpaceMatrix));
-		// Settea la matriz de vista y projection al shader para el fountain
-		shaderParticlesFountain.setMatrix4("projection", 1, false,
-				glm::value_ptr(projection));
-		shaderParticlesFountain.setMatrix4("view", 1, false,
-				glm::value_ptr(view));
 		// Settea la matriz de vista y projection al shader para el fuego
 		shaderParticlesFire.setMatrix4("projection", 1, false, 
 			glm::value_ptr(projection));
@@ -3239,11 +3058,6 @@ void applicationLoop() {
 		/****************************+
 		 * Open AL sound data
 		 */
-		source0Pos[0] = modelMatrixFountain[3].x;
-		source0Pos[1] = modelMatrixFountain[3].y;
-		source0Pos[2] = modelMatrixFountain[3].z;
-		alSourcefv(source[0], AL_POSITION, source0Pos);
-
 		/*
 		 * Actualizacion de la fuente de Darth reservada:
 		 * darthSourcePos[0] = modelMatrixDarth[3].x;
@@ -3343,12 +3157,6 @@ void applicationLoop() {
 		// listenerOri[5] = camera->getUp().z;
 		alListenerfv(AL_ORIENTATION, listenerOri);
 
-		for(unsigned int i = 0; i < sourcesPlay.size(); i++){
-			if(sourcesPlay[i]){
-				sourcesPlay[i] = false;
-				alSourcePlay(source[i]);
-			}
-		}
 	}
 }
 
